@@ -1,0 +1,6 @@
+{
+  "name": "mahjong",
+  "compatibility_date": "2026-11-01",
+  "assets": { "directory": "./public" },
+  "routes": [{ "pattern": "mahjong.jamesridey.dev", "custom_domain": true }]
+}

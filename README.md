@@ -9,4 +9,6 @@ A single-page Hong Kong mahjong game for learning, with a built-in coach.
 - Gallery of all scoring hands, filtered by how close your tiles are
 - Works on phones
 
-Open `index.html` in a browser; there is no build step.
+Open `public/index.html` in a browser; there is no build step.
+
+Hosted at https://mahjong.jamesridey.dev as a Cloudflare Worker with static assets. Deploy with `npx wrangler deploy`.
