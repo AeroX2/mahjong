@@ -1,0 +1,2126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mahjong Coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --felt:#1f6b4a; --felt2:#123f2b; --panel:#fbf7ec; --panel2:#f1e9d4; --ink:#2a2218; --muted:#7a6f5d;
+  --accent:#c8402e; --gold:#e6b84a; --ok:#2f8f4e; --bad:#b8452f; --coachW:480px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;width:100%;overflow:hidden;overscroll-behavior:none}
+body{background:#24170c;color:#f5efe0;font-family:Inter,system-ui,sans-serif;overflow:hidden;position:fixed;inset:0;touch-action:manipulation}
+button{font-family:inherit}
+header{height:64px;display:flex;align-items:center;gap:8px;padding:0 14px;background:linear-gradient(#3a2414,#26180c);border-bottom:1px solid #0008;position:relative;z-index:20}
+.brand{font-family:'Noto Serif SC',serif;font-weight:900;font-size:25px;margin-right:auto;display:flex;align-items:baseline;gap:10px}
+.brand small{font-family:Inter;font-weight:600;font-size:15px;color:#cdbf9f}
+.hbtn{background:#4a2f1a;color:#f5efe0;border:1px solid #6b4a2c;border-radius:9px;padding:7px 12px;font-weight:600;font-size:16.3px;cursor:pointer}
+.hbtn:hover{background:#5b3a20}
+.hbtn.gold{background:var(--gold);color:#2a1a0e;border-color:#b98d2a}
+.hbtn.gold:hover{background:#f0c75c}
+
+#table{position:absolute;top:64px;left:0;right:0;bottom:0;display:grid;
+  grid-template-columns:200px 1fr 200px;grid-template-rows:175px 1fr 300px;
+  grid-template-areas:"left top right" "left center right" "bottom bottom bottom";
+  background:radial-gradient(ellipse at 50% 45%,#2d9163 0%,var(--felt) 45%,var(--felt2) 100%);transition:right .3s;isolation:isolate;z-index:1}
+body.coach-open #table{right:var(--coachW)}
+.seat{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px;min-width:0;min-height:0}
+.seat.top{grid-area:top;justify-content:flex-start}
+.seat.left{grid-area:left;justify-content:center}
+.seat.right{grid-area:right;justify-content:center}
+.seat.bottom{grid-area:bottom;justify-content:flex-end;padding-bottom:12px}
+.seat.empty{visibility:hidden}
+.plate{display:flex;align-items:center;gap:6px;background:#0004;padding:4px 10px;border-radius:20px;font-size:16.3px;font-weight:600;white-space:nowrap;border:2px solid transparent}
+.plate.active{border-color:var(--gold);box-shadow:0 0 14px #e6b84a88}
+.plate .swind{font-family:'Noto Serif SC',serif;font-weight:900;background:#f5efe0;color:#2a1a0e;border-radius:6px;padding:1px 5px;font-size:17.5px}
+.plate .dealer{font-family:'Noto Serif SC',serif;background:var(--accent);color:#fff;border-radius:6px;padding:1px 5px;font-size:15px}
+.plate .pscore{color:var(--gold);font-variant-numeric:tabular-nums}
+.ai-hand{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}
+.seat.left .ai-hand,.seat.right .ai-hand{flex-direction:column;flex-wrap:nowrap;gap:1px}
+.meldrow{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:flex-end}
+.meld{display:flex;gap:1px;padding:2px;border-radius:6px;background:#0002}
+.flowers{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}
+.seat.left .meldrow,.seat.right .meldrow{flex-direction:column;align-items:center}
+
+/* Center pond */
+.center{grid-area:center;position:relative;margin:6px;border-radius:18px;background:#0000001f;box-shadow:inset 0 0 50px #00000040;min-height:0}
+#pond{position:absolute;inset:14px}
+.pond-tile{position:absolute;transform:translate(-50%,-50%) rotate(var(--r));transition:transform .15s}
+.pond-tile:hover{transform:translate(-50%,-50%) rotate(0deg) scale(1.7);z-index:999 !important}
+.pond-tile.last .tile{box-shadow:0 0 0 3px var(--gold),0 0 18px 4px #ffd76e,0 4px 8px #0006}
+.pond-tile.fresh{animation:drop .35s ease-out}
+@keyframes drop{from{opacity:0;transform:translate(-50%,-90%) rotate(0deg) scale(1.3)}to{opacity:1}}
+.center-info{position:absolute;left:12px;top:10px;font-size:15px;color:#e8f3ea;background:#0003;padding:5px 10px;border-radius:10px;pointer-events:none;z-index:1000}
+.center-info b{font-family:'Noto Serif SC',serif}
+.toast{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:#000a;padding:6px 14px;border-radius:12px;font-size:16.3px;pointer-events:none;z-index:1000;white-space:nowrap;max-width:95%;overflow:hidden;text-overflow:ellipsis}
+
+/* Human */
+.bottom-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;min-height:44px}
+#actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
+.prompt{font-size:17.5px;font-weight:600;color:#f9f1d8;display:flex;align-items:center;gap:6px}
+.handrow{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;justify-content:center}
+.hand{display:flex;gap:3px;align-items:flex-end}
+.hand .tile{--tw:var(--htw,60px);--th:var(--hth,81px);cursor:default;transition:transform .12s}
+body.myturn .hand .tile{cursor:pointer}
+body.myturn .hand .tile:hover{transform:translateY(-10px)}
+.hand .tile.drawn{margin-left:18px}
+.hand .tile{cursor:grab}
+.hand .tile.dragging{opacity:.35}
+.hand .tile.drop-before{box-shadow:-5px 0 0 0 var(--gold),0 6px 10px #0005}
+.hand .tile.drop-after{box-shadow:5px 0 0 0 var(--gold),0 6px 10px #0005}
+.hand .tile.dim{opacity:.35;filter:grayscale(.5)}
+.hand .tile.hint{animation:pulse 1s infinite;box-shadow:0 0 0 3px #ff5a3c,0 0 16px 3px #ff8a5c}
+.hand .tile.chowpart{box-shadow:0 0 0 3px #6ac1ff,0 0 14px #6ac1ff}
+@keyframes pulse{50%{transform:translateY(-8px)}}
+.act{background:#f3e6c4;color:#2a1a0e;border:none;border-radius:10px;padding:8px 14px;font-weight:700;font-size:17.5px;box-shadow:0 3px 0 #a88c52;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.act:hover{filter:brightness(1.06)}
+.act:active{transform:translateY(2px);box-shadow:0 1px 0 #a88c52}
+.act.win{background:var(--gold);box-shadow:0 3px 0 #9c7419}
+.act.pass{background:#d9d2c2}
+.act[disabled]{opacity:.55;cursor:not-allowed}
+.act .cn{font-family:'Noto Serif SC',serif;font-weight:900}
+
+/* Tiles */
+.tile{--tw:46px;--th:62px;width:var(--tw);height:var(--th);position:relative;border-radius:calc(var(--tw)*.14);
+  background:linear-gradient(160deg,#fffdf6 0%,#f4edd8 65%,#e6d9b6 100%);
+  box-shadow:0 calc(var(--th)*.07) 0 #c4ad78,0 calc(var(--th)*.07) 0 1px #8d7645,0 calc(var(--th)*.1) calc(var(--th)*.14) #0005;
+  display:flex;align-items:center;justify-content:center;color:#1b1b1b;font-size:calc(var(--th)*.4);line-height:1;flex:none;user-select:none;margin-bottom:calc(var(--th)*.07)}
+.tile.lg{--tw:46px;--th:62px}
+.tile.md{--tw:40px;--th:54px}
+.tile.sm{--tw:32px;--th:43px}
+.tile.xs{--tw:24px;--th:32px}
+.tile.inline{--tw:26px;--th:35px}
+.tile.inline{display:inline-flex;vertical-align:middle;margin:0 2px 3px}
+.tile svg{width:88%;height:88%;display:block}
+.tile.back{background:linear-gradient(160deg,#3cae80,#1e7553);box-shadow:0 calc(var(--th)*.07) 0 #efe5c8,0 calc(var(--th)*.07) 0 1px #8d7645,0 3px 5px #0005}
+.tile.side{--tw:40px;--th:25px;border-radius:4px;margin-bottom:2px}
+.man{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.06em}
+.man .cnn,.man .arn{display:none}
+.man .cnn{font-family:'Noto Serif SC',serif;font-weight:900;color:#1a2a6c;font-size:.95em}
+.man .arn{font-family:Inter,sans-serif;font-weight:800;color:#1a2a6c;font-size:.95em}
+.man .wan{font-family:'Noto Serif SC',serif;font-weight:900;color:#b8261b;font-size:1em}
+body.mode-hover .man .arn,body.mode-quiz .man .cnn,body.mode-chinese .man .cnn,body.mode-arabic .man .arn{display:block}
+body.mode-hover .tile:hover .man .arn{display:none}
+body.mode-hover .tile:hover .man .cnn{display:block}
+body.mode-quiz .tile:hover .man .cnn{display:none}
+body.mode-quiz .tile:hover .man .arn{display:block}
+.hon{display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+.hon .hc{font-family:'Noto Serif SC',serif;font-weight:900;font-size:1.3em}
+.hl{position:absolute;top:5%;left:8%;font-size:.3em;font-family:Inter,sans-serif;font-weight:800;color:#8a7d64}
+.hon.red .hc{color:#c0261b}.hon.green .hc{color:#17824a}
+.wframe{width:56%;height:66%;border:.1em solid #2a62b8;border-radius:.12em;box-shadow:inset 0 0 0 .07em #fffdf6,inset 0 0 0 .13em #2a62b8}
+.bon{display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+.bon .hc{font-family:'Noto Serif SC',serif;font-weight:900;font-size:1.15em;color:#9b2d7a}
+.bon.season .hc{color:#c06a12}
+
+/* Coach */
+#coach{position:absolute;top:64px;right:0;bottom:0;width:var(--coachW);transform:translateX(100%);transition:transform .3s,visibility 0s .3s;visibility:hidden;background:var(--panel);color:var(--ink);overflow-y:auto;box-shadow:-8px 0 24px #0006;z-index:10}
+body.coach-open #coach{transform:none;visibility:visible;transition:transform .3s,visibility 0s}
+.ch{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 6px}
+.ch h2{margin:0;font-size:21.3px;font-family:'Noto Serif SC',serif}
+.ch h2 span{font-family:Inter;font-weight:600;font-size:15px;color:var(--muted);margin-left:6px}
+.xbtn{background:none;border:none;font-size:25px;cursor:pointer;color:var(--muted)}
+.sec{padding:10px 16px;border-top:1px solid #e4dac1}
+.sec h3{margin:0 0 8px;font-size:15px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.status{font-size:18.8px;font-weight:700}
+.status .sub{display:block;font-weight:500;font-size:15.6px;color:var(--muted);margin-top:3px}
+.hintbox{margin-top:8px;background:#fff;border:1px solid #e6d9b6;border-left:4px solid var(--accent);border-radius:8px;padding:9px 11px;font-size:16.9px;line-height:1.5}
+.hintbtn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px;font-weight:700;font-size:17.5px;cursor:pointer;box-shadow:0 3px 0 #8e2a1d}
+.hintbtn:hover{filter:brightness(1.07)}
+.trow{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:8px 10px;border-radius:9px;cursor:pointer;border:1px solid transparent;margin-bottom:4px;background:#fff}
+.trow:hover{border-color:#d8c79a}
+.trow.focus{border-color:var(--accent);background:#fff6ef}
+.trow.nq{opacity:.62}
+.tname{font-weight:700;font-size:16.9px}
+.tname .cn{font-family:'Noto Serif SC',serif;font-weight:900;margin-right:5px}
+.tfan{font-weight:800;font-size:16.3px;text-align:right;white-space:nowrap}
+.tfan.ok{color:var(--ok)}.tfan.no{color:var(--bad)}
+.tmeta{font-size:15px;color:var(--muted);display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.bar{grid-column:1/3;height:7px;background:#eee3c8;border-radius:4px;overflow:hidden;position:relative}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#d77a3a,#c8402e);border-radius:4px}
+.pct{font-size:15px;font-weight:700;color:var(--accent)}
+.ready{background:#fff;border-radius:9px;padding:8px 10px;margin-bottom:6px;font-size:16.3px;border:1px solid #e6d9b6}
+.ready .wl{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+.wt{display:flex;align-items:center;gap:3px;font-size:14.4px;background:var(--panel2);border-radius:6px;padding:2px 5px 0}
+.wt.ok{background:#dff1e2}.wt.so{background:#fbf0cc}.wt.no{background:#f5dcd5}
+.fanlist{font-size:16.3px;line-height:1.7}
+.fanlist .cn{font-family:'Noto Serif SC',serif;font-weight:900}
+details{font-size:16.3px}
+details summary{cursor:pointer;font-weight:700;padding:4px 0}
+table.rules{width:100%;border-collapse:collapse;font-size:15.6px;margin-top:4px}
+table.rules td{padding:3px 4px;border-bottom:1px solid #ece2c9}
+table.rules td.cn{font-family:'Noto Serif SC',serif;font-weight:900;white-space:nowrap}
+table.rules td.f{text-align:right;font-weight:800;white-space:nowrap}
+.numgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:6px}
+.numcard{background:#fff;border-radius:8px;text-align:center;padding:6px 2px;border:1px solid #e6d9b6;cursor:pointer}
+.numcard .c{font-family:'Noto Serif SC',serif;font-weight:900;font-size:27.5px;color:#1a2a6c}
+.numcard .p{font-size:13.8px;color:var(--muted)}
+.numcard .a{font-size:16.3px;font-weight:800}
+.numgrid.quiz .numcard:not(:hover) .a,.numgrid.quiz .numcard:not(:hover) .p{visibility:hidden}
+.log{font-size:15.6px;line-height:1.6;max-height:220px;overflow-y:auto;color:#4a4033}
+.log div{border-bottom:1px dashed #e8dec6;padding:1px 0}
+.muted{color:var(--muted)}
+
+/* Modal */
+.overlay{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:100;padding:16px}
+.overlay.show{display:flex}
+.modal{background:var(--panel);color:var(--ink);border-radius:16px;padding:22px 24px;max-width:760px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px #000a}
+.modal h2{margin:0 0 4px;font-family:'Noto Serif SC',serif;font-size:30px}
+.modal .lead{color:var(--muted);margin:0 0 14px;font-size:17.5px}
+.field{margin:12px 0}
+.field label.t{display:block;font-weight:700;font-size:16.3px;margin-bottom:6px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg label{border:1.5px solid #d8c79a;border-radius:9px;padding:7px 11px;font-size:16.3px;cursor:pointer;background:#fff}
+.seg input{display:none}
+.seg label:has(input:checked){border-color:var(--accent);background:#fff1ea;font-weight:700}
+.chk{display:flex;align-items:center;gap:8px;font-size:16.9px;margin:6px 0}
+.mbtns{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+.mbtn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:17.5px;cursor:pointer}
+.mbtn.sec2{background:#e8dcc0;color:var(--ink)}
+.endhand{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:#1f6b4a;padding:12px;border-radius:12px;margin:10px 0}
+.endhand .grp{display:flex;gap:2px}
+.endhand .tile.winning{box-shadow:0 0 0 3px var(--gold),0 0 12px var(--gold)}
+table.fans{width:100%;border-collapse:collapse;font-size:17.5px}
+table.fans td{padding:5px 6px;border-bottom:1px solid #e6dcc4}
+table.fans td.cn{font-family:'Noto Serif SC',serif;font-weight:900}
+table.fans td.f{text-align:right;font-weight:800}
+table.fans tr.tot td{font-weight:800;border-bottom:none;font-size:18.8px}
+.pay{font-size:16.3px;color:var(--muted);margin-top:8px}
+
+/* layout breakpoints are toggled from JS so they follow the interface size setting */
+body.narrow.coach-open #table{right:0}
+body.narrow #coach{width:min(var(--coachW),calc(100vw / var(--z,1)))}
+body.narrow #table{grid-template-columns:96px 1fr 96px}
+body.narrow .brand small{display:none}
+body.tiny .brand{font-size:18.8px} body.tiny .hbtn{padding:6px 8px;font-size:15px}
+body.tiny #table{grid-template-columns:64px 1fr 64px;grid-template-rows:110px 1fr 190px}
+body.tiny .sizer span{display:none}
+/* ---------- Phone layout ---------- */
+body.mobile header{gap:4px;padding:0 6px}
+body.mobile .lbl, body.mobile .brand small, body.mobile .sizer span{display:none}
+body.mobile .hbtn{padding:7px 9px;font-size:18px}
+body.mobile .brand{font-size:20px}
+body.mobile #table{grid-template-columns:1fr;grid-template-rows:auto minmax(160px,1fr) auto;grid-template-areas:"top" "center" "bottom"}
+body.mobile #seat-left, body.mobile #seat-right{display:none}
+body.mobile .seat.top{padding:6px 6px 0}
+body.mobile .ai-strip{display:flex;gap:6px;width:100%;justify-content:space-between}
+body.mobile .ai-card{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;background:#0002;border-radius:10px;padding:5px 3px}
+body.mobile .ai-card .plate{font-size:13px;padding:2px 6px;gap:4px}
+body.mobile .ai-card .plate .swind{font-size:13px}
+body.mobile .ai-count{font-size:13px;color:#d9eadf;display:flex;flex-wrap:wrap;justify-content:center;gap:1px}
+body.mobile .ai-card .meldrow{gap:3px}
+body.mobile .center{margin:4px 6px}
+body.mobile #pond{inset:6px}
+body.mobile .pond-tile .tile{--tw:30px;--th:40px}
+body.mobile .center-info{font-size:12px;left:6px;top:4px;padding:3px 7px}
+body.mobile .toast{font-size:14px}
+body.mobile .seat.bottom{padding:4px 8px 10px;gap:6px}
+body.mobile .bottom-top{gap:6px;min-height:0}
+body.mobile .bottom-top .plate{font-size:14px}
+body.mobile .act{font-size:15px;padding:8px 11px}
+body.mobile .prompt{font-size:14px;text-align:center}
+body.mobile .handrow{gap:8px;flex-direction:column;align-items:center}
+body.mobile .side-sets{flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:flex-end}
+body.mobile .side-sets .tile.lg{--tw:30px;--th:40px}
+body.mobile #coach{top:64px;width:100vw}
+body.mobile .overlay{padding:10px;align-items:flex-start;padding-top:max(10px,env(safe-area-inset-top))}
+body.mobile .modal{padding:16px 14px 14px;border-radius:14px;max-height:calc(100dvh - 20px) !important;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+body.mobile .modal h2{font-size:21px}
+body.mobile .modal .lead{font-size:15px;margin-bottom:10px}
+body.mobile .field{margin:9px 0}
+body.mobile .seg{gap:5px}
+body.mobile .seg label{font-size:14px;padding:6px 9px}
+body.mobile .chk{font-size:15px}
+body.mobile .mbtns{flex-wrap:wrap;margin-top:12px}
+body.mobile .mbtn{flex:1 1 auto;padding:11px 12px;font-size:15px}
+body.mobile table.fans{font-size:14px}
+body.mobile .endhand{padding:8px;gap:6px}
+body.mobile .endhand .tile.md{--tw:26px;--th:35px}
+body.mobile .rv-sum{gap:10px;padding:10px}
+body.mobile .rv-score{font-size:34px}
+body.mobile .rv-tiles .tile.sm{--tw:24px;--th:32px}
+body.mobile .rv-note{font-size:14px}
+body.mobile #coach{overscroll-behavior:contain}
+/* touch: tap once to lift & reveal, tap again to discard */
+.tray .tile.sel{transform:translateY(-12px);box-shadow:0 0 0 3px var(--gold),0 10px 16px #0006}
+body.mode-hover .tile.reveal .man .arn{display:none}
+body.mode-hover .tile.reveal .man .cnn{display:block}
+body.mode-quiz .tile.reveal .man .cnn{display:none}
+body.mode-quiz .tile.reveal .man .arn{display:block}
+.modal{max-height:calc(92vh / var(--z,1)) !important}
+.modal.review{max-width:860px}
+.rv-sum{display:flex;align-items:center;gap:18px;background:#fff;border:1px solid #e6d9b6;border-radius:12px;padding:12px 16px;margin:6px 0 10px}
+.rv-score{font-size:44px;font-weight:800;color:var(--accent);line-height:1;white-space:nowrap}
+.rv-score small{font-size:16px;color:var(--muted)}
+.rv-chips{display:flex;flex-wrap:wrap;gap:6px}
+.rv-chip{font-size:14px;padding:4px 9px;border-radius:999px;background:var(--panel2)}
+.rv-legend{display:flex;gap:18px;font-size:14px;color:var(--muted);margin:4px 0 10px}
+.rv-legend span{display:flex;align-items:center;gap:8px}
+.rv-move{background:#fff;border:1px solid #e6d9b6;border-left:6px solid #ccc;border-radius:10px;padding:10px 14px;margin-bottom:10px}
+.rv-head{display:flex;align-items:center;gap:10px;font-size:14px;margin-bottom:4px}
+.rv-n{color:var(--muted);font-weight:700}
+.rv-grade{font-weight:800}
+.rv-hint{font-size:12px;background:#fbf0cc;border-radius:6px;padding:1px 6px}
+.rv-title{font-size:16px;font-weight:600;margin-bottom:6px}
+.rv-tiles{display:flex;flex-wrap:wrap;gap:3px;align-items:flex-end;margin-bottom:6px}
+.rv-plus{font-weight:800;margin:0 6px 12px}
+.rv-note{font-size:15px;line-height:1.6}
+.rv-note .why{color:var(--muted)}
+.tile.rv-mine{box-shadow:0 0 0 3px #d6452f,0 4px 6px #0004}
+.tile.rv-rec{box-shadow:0 0 0 3px #2f8f4e,0 4px 6px #0004}
+.tile.rv-offer{box-shadow:0 0 0 3px var(--gold)}
+.g-best{border-left-color:#2f8f4e}.g-good{border-left-color:#7cb342}.g-inacc{border-left-color:#e6a23c}.g-mistake{border-left-color:#d6452f}.g-blunder{border-left-color:#8e1f5c}
+.rv-chip.g-best{background:#dff1e2}.rv-chip.g-good{background:#ecf5d9}.rv-chip.g-inacc{background:#fbefd6}.rv-chip.g-mistake{background:#f8dcd5}.rv-chip.g-blunder{background:#f2d7e5}
+.tray{position:relative;flex:none;background:#00000022;border:1px dashed #ffffff30;border-radius:12px;box-shadow:inset 0 2px 10px #0003}
+.tray .tile{position:absolute;--tw:var(--htw,60px);--th:var(--hth,81px);transition:left .15s,top .15s,transform .12s;cursor:grab;touch-action:none;margin:0}
+body.myturn .tray .tile{cursor:pointer}
+body.myturn .tray .tile:hover{transform:translateY(-8px)}
+.tray .tile.dragging{transition:none;z-index:50;cursor:grabbing;transform:scale(1.08) rotate(-2deg);box-shadow:0 14px 24px #0007}
+.tray .tile.drawn{box-shadow:0 0 0 3px #7fd3ff,0 0 14px #7fd3ff}
+.tray .tile.dim{opacity:.35;filter:grayscale(.5)}
+.tray .tile.hint{animation:pulse 1s infinite;box-shadow:0 0 0 3px #ff5a3c,0 0 16px 3px #ff8a5c}
+.tray .tile.chowpart{box-shadow:0 0 0 3px #6ac1ff,0 0 14px #6ac1ff}
+.tkeep{grid-column:1/3;font-size:14px;line-height:1.5;color:var(--ink);background:#fff6ef;border-radius:6px;padding:6px 8px;margin-top:4px}
+.side-sets{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.opp{background:#fff;border:1px solid #e6d9b6;border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:14px}
+.opp-h{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.opp-h .swind{font-family:'Noto Serif SC',serif;font-weight:900;background:var(--panel2);border-radius:5px;padding:0 4px}
+.thr{margin-left:auto;font-size:12.5px;font-weight:700;border-radius:999px;padding:2px 8px}
+.thr-low{background:#dff1e2;color:#1f6b35}.thr-med{background:#fbefd6;color:#8a5a0e}.thr-high{background:#f8dcd5;color:#9b2c1c}
+.opp .bar{height:5px;margin-bottom:6px}
+.opp-disc{display:flex;flex-wrap:wrap;align-items:center;margin-bottom:4px}
+.opp ul{margin:4px 0 0;padding-left:18px;line-height:1.5}
+.opp li{margin-bottom:3px}
+.supply,.dgroups{font-size:14px;line-height:1.55;background:#fff;border:1px solid #e6d9b6;border-radius:10px;padding:8px 10px;margin-bottom:8px}
+.dg{display:flex;align-items:center;flex-wrap:wrap;gap:2px;margin:4px 0}
+.dlab{font-size:12.5px;font-weight:700;border-radius:999px;padding:2px 8px;margin-right:6px;min-width:84px;text-align:center}
+.d-safe{background:#dff1e2;color:#1f6b35}.d-low{background:#ecf5d9;color:#3f6212}.d-med{background:#fbefd6;color:#8a5a0e}.d-high{background:#f8dcd5;color:#9b2c1c}
+.tray .tile[class*=" dd-"]::after{content:"";position:absolute;right:3px;bottom:3px;width:9px;height:9px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px #0003}
+.tray .tile.dd-safe::after{background:#2f8f4e}.tray .tile.dd-low::after{background:#9bc53d}.tray .tile.dd-med::after{background:#e6a23c}.tray .tile.dd-high::after{background:#d6452f}
+.modal.hands{max-width:900px}
+.hslider{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid #e6d9b6;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:15px}
+.hslider input{flex:1;min-width:140px;accent-color:var(--accent)}
+.hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.hcard{background:#fff;border:1px solid #e6d9b6;border-radius:10px;padding:10px 12px}
+.hcard.hc-no{opacity:.55}
+.hc-top{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.hc-top .cn{font-family:'Noto Serif SC',serif;font-weight:900;font-size:18px}
+.hc-en{font-weight:700;font-size:15px}
+.hc-fan{margin-left:auto;font-weight:800;color:var(--accent);font-size:14px;white-space:nowrap}
+.gdist{display:inline-block;font-size:13px;font-weight:700;border-radius:999px;padding:2px 9px;margin:5px 0 3px}
+.gd-ok{background:#dff1e2;color:#1f6b35}.gd-near{background:#fbefd6;color:#8a5a0e}.gd-far{background:#efe8d6;color:#6b5d44}.gd-no{background:#eee;color:#777}
+.hc-ex{display:flex;flex-wrap:wrap;gap:1px;margin:6px 0}
+.hc-d{font-size:14px;line-height:1.45;color:#4a4033}
+body.mobile .hgrid{grid-template-columns:1fr}
+.sizer{display:flex;align-items:center;gap:4px;margin-right:6px}
+.sizer span{min-width:44px;text-align:center;font-size:14px;font-weight:700;color:#e8dcc0}
+#tip{position:fixed;pointer-events:none;background:#1b140c;color:#f7eed6;padding:6px 10px;border-radius:8px;font-size:15.6px;z-index:2000;display:none;box-shadow:0 4px 14px #0008;max-width:280px;line-height:1.45}
+#tip b{font-family:'Noto Serif SC',serif;font-size:20px}
+.sty{display:inline-block;margin-left:5px;padding:0 5px;border-radius:5px;background:rgba(255,255,255,.16);font-family:'Noto Serif SC',serif;font-size:.9em;cursor:help}
+</style>
+</head>
+<body class="mode-hover coach-open">
+<header>
+  <div class="brand">麻雀<span class="lbl"> Mahjong Coach</span> <small id="roundInfo"></small></div>
+  <div class="sizer" title="Interface size (− / + keys)"><button class="hbtn" id="scaleDown" aria-label="Smaller">A−</button><span id="scalePct">100%</span><button class="hbtn" id="scaleUp" aria-label="Bigger">A+</button></div>
+  <button class="hbtn gold" id="hintTop" title="Hint (H)">💡<span class="lbl"> Hint</span></button>
+  <button class="hbtn" id="coachToggle" title="Toggle coach (C)">🎓<span class="lbl"> Coach</span></button>
+  <button class="hbtn" id="reviewBtn" title="Review your moves this hand">📝<span class="lbl"> Review</span></button>
+  <button class="hbtn" id="handsBtn" title="All hands — and how close yours is">🀄<span class="lbl"> Hands</span></button>
+  <button class="hbtn" id="rulesBtn" title="Rules">📖<span class="lbl"> Rules</span></button>
+  <button class="hbtn" id="settingsBtn" title="New game / settings">⚙<span class="lbl"> New game</span></button>
+</header>
+
+<main id="table">
+  <div class="seat top" id="seat-top"></div>
+  <div class="seat left" id="seat-left"></div>
+  <div class="center" id="center">
+    <div class="center-info" id="centerInfo"></div>
+    <div id="pond"></div>
+    <div class="toast" id="toast" style="display:none"></div>
+  </div>
+  <div class="seat right" id="seat-right"></div>
+  <div class="seat bottom" id="seat-bottom"></div>
+</main>
+
+<aside id="coach">
+  <div class="ch"><h2>教練 Coach<span>your private advisor</span></h2><button class="xbtn" id="coachClose" aria-label="Close coach">×</button></div>
+  <div id="coachBody"></div>
+</aside>
+
+<div class="overlay" id="settingsModal">
+  <div class="modal">
+    <h2>麻雀 New game</h2>
+    <p class="lead">Hong Kong rules · you need at least <b>3 fan</b> (番) to win.</p>
+    <div class="field"><label class="t">AI opponents</label>
+      <div class="seg" id="aiSeg">
+        <label><input type="radio" name="ai" value="1">1 opponent</label>
+        <label><input type="radio" name="ai" value="2">2 opponents</label>
+        <label><input type="radio" name="ai" value="3">3 opponents</label>
+      </div></div>
+    <div class="field"><label class="t">AI personalities</label>
+      <div class="seg" id="styleSeg">
+        <label><input type="radio" name="aistyle" value="mixed">Mixed styles</label>
+        <label><input type="radio" name="aistyle" value="balanced">All balanced</label>
+        <label><input type="radio" name="aistyle" value="easy">Beginners (easy)</label>
+      </div></div>
+    <div class="field"><label class="t">Character tiles (萬) numbers</label>
+      <div class="seg" id="modeSeg">
+        <label><input type="radio" name="mode" value="hover">Show 1–9, Chinese on hover</label>
+        <label><input type="radio" name="mode" value="quiz">Quiz: Chinese, 1–9 on hover</label>
+        <label><input type="radio" name="mode" value="chinese">Always Chinese</label>
+      </div></div>
+    <div class="field"><label class="t">AI speed</label>
+      <div class="seg" id="speedSeg">
+        <label><input type="radio" name="speed" value="slow">Slow</label>
+        <label><input type="radio" name="speed" value="normal">Normal</label>
+        <label><input type="radio" name="speed" value="fast">Fast</label>
+      </div></div>
+    <label class="chk"><input type="checkbox" id="optFlowers"> Play with flower &amp; season tiles (bonus fan)</label>
+    <div class="field"><label class="t">Interface size: <span id="optScaleVal">100%</span></label>
+      <input type="range" id="optScale" min="0.8" max="1.8" step="0.05" style="width:100%;accent-color:var(--accent)">
+      <div class="muted" style="font-size:14px">Changes instantly. You can also use the A− / A+ buttons in the top bar or the − / + keys.</div></div>
+    <label class="chk"><input type="checkbox" id="optTips"> Show pinyin tooltips when hovering tiles</label>
+    <div class="mbtns"><button class="mbtn sec2" id="settingsCancel">Cancel</button><button class="mbtn" id="startBtn">Start game</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="endModal"><div class="modal" id="endBody"></div></div>
+<div class="overlay" id="rulesModal"><div class="modal" id="rulesBody"></div></div>
+<div class="overlay" id="handsModal"><div class="modal hands" id="handsBody"></div></div>
+<div class="overlay" id="reviewModal"><div class="modal review" id="reviewBody"></div></div>
+<div id="tip"></div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const INF = 99;
+
+/* ================= Tile data ================= */
+const CN_NUM = ['一','二','三','四','五','六','七','八','九'];
+const PY_NUM = ['yī','èr','sān','sì','wǔ','liù','qī','bā','jiǔ'];
+const SUITS = [
+  {en:'Characters', cn:'萬', py:'wàn'},
+  {en:'Dots', cn:'筒', py:'tǒng'},
+  {en:'Bamboo', cn:'索', py:'suǒ'}];
+const HONORS = [
+  {cn:'東',py:'dōng',en:'East Wind',l:'E'},{cn:'南',py:'nán',en:'South Wind',l:'S'},
+  {cn:'西',py:'xī',en:'West Wind',l:'W'},{cn:'北',py:'běi',en:'North Wind',l:'N'},
+  {cn:'中',py:'zhōng',en:'Red Dragon',l:'R'},{cn:'發',py:'fā',en:'Green Dragon',l:'G'},
+  {cn:'白',py:'bái',en:'White Dragon',l:'Wh'}];
+const BONUS = [
+  {cn:'梅',py:'méi',en:'Plum',kind:'Flower',n:1},{cn:'蘭',py:'lán',en:'Orchid',kind:'Flower',n:2},
+  {cn:'菊',py:'jú',en:'Chrysanthemum',kind:'Flower',n:3},{cn:'竹',py:'zhú',en:'Bamboo',kind:'Flower',n:4},
+  {cn:'春',py:'chūn',en:'Spring',kind:'Season',n:1},{cn:'夏',py:'xià',en:'Summer',kind:'Season',n:2},
+  {cn:'秋',py:'qiū',en:'Autumn',kind:'Season',n:3},{cn:'冬',py:'dōng',en:'Winter',kind:'Season',n:4}];
+const ORPHANS = [0,8,9,17,18,26,27,28,29,30,31,32,33];
+const isFlower = t => t >= 34;
+const suitOf = t => t < 27 ? Math.floor(t/9) : 3;
+const isTerm = t => t < 27 && (t%9===0 || t%9===8);
+function tileName(t){
+  if (t < 27) return `${t%9+1} ${SUITS[suitOf(t)].en}`;
+  if (t < 34) return HONORS[t-27].en;
+  const b = BONUS[t-34]; return `${b.en} (${b.kind} ${b.n})`;
+}
+function tileTip(t){
+  if (t < 27){ const s = SUITS[suitOf(t)], n=t%9;
+    return `<b>${CN_NUM[n]}${s.cn}</b> &nbsp;${PY_NUM[n]} ${s.py}<br>${n+1} of ${s.en} &nbsp;·&nbsp; ${CN_NUM[n]} = ${n+1}`; }
+  if (t < 34){ const h = HONORS[t-27]; return `<b>${h.cn}</b> &nbsp;${h.py}<br>${h.en}`; }
+  const b = BONUS[t-34]; return `<b>${b.cn}</b> &nbsp;${b.py}<br>${b.en} — ${b.kind} ${b.n} (bonus tile)`;
+}
+
+/* ---- Tile faces ---- */
+const CB='#1f5fa8', CG='#1d7a3f', CR='#c0392b';
+const DOT_POS = {1:[[15,21,11]],2:[[15,11,6.4],[15,31,6.4]],3:[[7.5,9,5.6],[15,21,5.6],[22.5,33,5.6]],
+ 4:[[9,11,5.8],[21,11,5.8],[9,31,5.8],[21,31,5.8]],5:[[8,9,5],[22,9,5],[15,21,5],[8,33,5],[22,33,5]],
+ 6:[[9,8,5],[21,8,5],[9,22,5],[21,22,5],[9,34,5],[21,34,5]],
+ 7:[[6,6.5,4.2],[15,11.5,4.2],[24,16.5,4.2],[9,26,4.4],[21,26,4.4],[9,36,4.4],[21,36,4.4]],
+ 8:[[9,6,4.3],[21,6,4.3],[9,16,4.3],[21,16,4.3],[9,26,4.3],[21,26,4.3],[9,36,4.3],[21,36,4.3]],
+ 9:[[6,8,4.3],[15,8,4.3],[24,8,4.3],[6,21,4.3],[15,21,4.3],[24,21,4.3],[6,34,4.3],[15,34,4.3],[24,34,4.3]]};
+const DOT_COL = {2:[CG,CB],3:[CB,CR,CG],4:[CB,CG,CG,CB],5:[CB,CG,CR,CG,CB],6:[CG,CG,CR,CR,CR,CR],
+ 7:[CG,CG,CG,CR,CR,CR,CR],8:Array(8).fill(CB),9:[CB,CB,CB,CR,CR,CR,CG,CG,CG]};
+function dotSVG(n){
+  let s = '<svg viewBox="0 0 30 42">';
+  if (n===1){
+    s += `<circle cx="15" cy="21" r="12" fill="${CG}"/><circle cx="15" cy="21" r="9.6" fill="#fffdf6"/><circle cx="15" cy="21" r="8.2" fill="${CR}"/>`+
+      `<circle cx="15" cy="21" r="5" fill="none" stroke="#fffdf6" stroke-width="1.3" stroke-dasharray="2 1.4"/><circle cx="15" cy="21" r="2" fill="#fffdf6"/>`;
+  } else DOT_POS[n].forEach(([x,y,r],i)=>{ const c = DOT_COL[n][i];
+    s += `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}"/><circle cx="${x}" cy="${y}" r="${(r*.62).toFixed(2)}" fill="none" stroke="#fffdf6" stroke-width="${(r*.17).toFixed(2)}"/><circle cx="${x}" cy="${y}" r="${(r*.22).toFixed(2)}" fill="#fffdf6"/>`; });
+  return s + '</svg>';
+}
+const BAM_POS = {2:[[15,11],[15,31]],3:[[15,11],[9,31],[21,31]],4:[[9,11],[21,11],[9,31],[21,31]],
+ 5:[[7,11],[23,11],[15,21],[7,31],[23,31]],6:[[7,11],[15,11],[23,11],[7,31],[15,31],[23,31]],
+ 7:[[15,7],[7,21],[15,21],[23,21],[7,35],[15,35],[23,35]],
+ 8:[[5,11],[12,11],[19,11],[26,11],[5,31],[12,31],[19,31],[26,31]],
+ 9:[[7,8],[15,8],[23,8],[7,21],[15,21],[23,21],[7,34],[15,34],[23,34]]};
+const BAM_COL = {2:[CG,CB],3:[CB,CG,CG],4:[CG,CB,CB,CG],5:[CG,CB,CR,CB,CG],6:[CG,CG,CG,CB,CB,CB],
+ 7:[CR,CG,CG,CG,CB,CB,CB],8:[CG,CG,CG,CG,CB,CB,CB,CB],9:[CG,CR,CB,CG,CR,CB,CG,CR,CB]};
+function stick(x,y,c,h){
+  return `<rect x="${x-2.3}" y="${y-h/2}" width="4.6" height="${h}" rx="2.1" fill="${c}"/>`+
+    `<rect x="${x-2.8}" y="${y-.8}" width="5.6" height="1.6" rx=".8" fill="${c}" stroke="#fffdf6" stroke-width=".45"/>`+
+    `<line x1="${x}" y1="${y-h/2+1.6}" x2="${x}" y2="${y+h/2-1.6}" stroke="#fffdf6" stroke-width=".7" opacity=".55"/>`;
+}
+function bamSVG(n){
+  let s = '<svg viewBox="0 0 30 42">';
+  if (n===1){
+    s += `<path d="M6 31 Q3 20 10 14 Q15 9 20 11 Q25 14 22 20 L27 19 L23 23 Q21 31 13 34 Z" fill="${CG}"/>`+
+      `<path d="M10 22 Q14 19 18 22 Q14 26 10 22Z" fill="${CB}"/>`+
+      `<circle cx="20" cy="11.5" r="3.3" fill="${CR}"/><path d="M23 10.5 L27.5 12 L23 13.2Z" fill="#e08a1e"/><circle cx="20.6" cy="11" r=".9" fill="#fffdf6"/>`+
+      `<path d="M7 31 Q2 36 4 41 M10 32 Q8 37 11 41 M13 33 Q14 38 17 41" stroke="${CR}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
+  } else { const h = n<=6 ? 15 : 11.6; BAM_POS[n].forEach(([x,y],i)=> s += stick(x,y,BAM_COL[n][i],h)); }
+  return s + '</svg>';
+}
+const FACE = [];
+for (let t=0;t<42;t++){
+  if (t<9) FACE[t] = `<div class="man"><span class="cnn">${CN_NUM[t]}</span><span class="arn">${t+1}</span><span class="wan">萬</span></div>`;
+  else if (t<18) FACE[t] = dotSVG(t-8);
+  else if (t<27) FACE[t] = bamSVG(t-17);
+  else if (t<31) FACE[t] = `<div class="hon wind"><span class="hl">${HONORS[t-27].l}</span><span class="hc">${HONORS[t-27].cn}</span></div>`;
+  else if (t===31) FACE[t] = `<div class="hon red"><span class="hl">R</span><span class="hc">中</span></div>`;
+  else if (t===32) FACE[t] = `<div class="hon green"><span class="hl">G</span><span class="hc">發</span></div>`;
+  else if (t===33) FACE[t] = `<div class="hon"><span class="hl">Wh</span><span class="wframe"></span></div>`;
+  else { const b = BONUS[t-34]; FACE[t] = `<div class="bon ${b.kind==='Season'?'season':''}"><span class="hl">${b.n}</span><span class="hc">${b.cn}</span></div>`; }
+}
+const tileHTML = (t, cls='', attrs='') => `<div class="tile ${cls}" data-t="${t}" ${attrs}>${FACE[t]}</div>`;
+const backHTML = (cls='') => `<div class="tile back ${cls}"></div>`;
+const mini = t => tileHTML(t, 'inline');
+
+/* ================= Shanten engine ================= */
+const suitCache = new Map();
+function suitOptions(arr, noPung){
+  const key = (noPung?'c':'n') + arr.join('');
+  let r = suitCache.get(key); if (r) return r;
+  const set = new Set(), c = arr.slice(), seen = new Set();
+  (function dfs(i,m,t,p){
+    while (i<9 && !c[i]) i++;
+    if (i===9){ set.add(m*100+Math.min(t,8)*10+p); return; }
+    const sk = c.join('')+i+'|'+m+t+p; if (seen.has(sk)) return; seen.add(sk);
+    if (!noPung && c[i]>=3){ c[i]-=3; dfs(i,m+1,t,p); c[i]+=3; }
+    if (i<=6 && c[i+1] && c[i+2]){ c[i]--;c[i+1]--;c[i+2]--; dfs(i,m+1,t,p); c[i]++;c[i+1]++;c[i+2]++; }
+    if (!p && c[i]>=2){ c[i]-=2; dfs(i,m,t,1); c[i]+=2; }
+    if (!noPung && c[i]>=2){ c[i]-=2; dfs(i,m,t+1,p); c[i]+=2; }
+    if (i<=7 && c[i+1]){ c[i]--;c[i+1]--; dfs(i,m,t+1,p); c[i]++;c[i+1]++; }
+    if (i<=6 && c[i+2]){ c[i]--;c[i+2]--; dfs(i,m,t+1,p); c[i]++;c[i+2]++; }
+    c[i]--; dfs(i,m,t,p); c[i]++;
+  })(0,0,0,0);
+  r = [...set].map(k=>[Math.floor(k/100), Math.floor(k/10)%10, k%10]);
+  suitCache.set(key, r); return r;
+}
+function honorOpts(n, noPung){
+  const o = [[0,0,0]];
+  if (n>=3 && !noPung) o.push([1,0,0]);
+  if (n>=2){ o.push([0,0,1]); if (!noPung) o.push([0,1,0]); }
+  return o;
+}
+function mergeOpts(a,b){
+  const m = new Map();
+  for (const x of a) for (const y of b){
+    const p = x[2]+y[2]; if (p>1) continue;
+    const mm = x[0]+y[0], tt = Math.min(x[1]+y[1], 6), k = mm*100+tt*10+p;
+    if (!m.has(k)) m.set(k,[mm,tt,p]);
+  }
+  return [...m.values()];
+}
+function shStd(c, exp, noPung){
+  let opts = [[0,0,0]];
+  for (let s=0;s<3;s++){ const seg = c.slice(s*9,s*9+9); if (seg.some(v=>v)) opts = mergeOpts(opts, suitOptions(seg, noPung)); }
+  for (let h=27;h<34;h++) if (c[h]) opts = mergeOpts(opts, honorOpts(c[h], noPung));
+  let best = INF;
+  for (const [m,t,p] of opts){
+    const M = Math.min(4, m+exp), T = Math.min(t, Math.max(0, 4-M));
+    const s = 8 - 2*M - T - p; if (s<best) best = s;
+  }
+  return best;
+}
+function shPungs(c, melds){
+  if (melds.some(m=>m.kind==='chow')) return INF;
+  let m = melds.length, p = 0;
+  for (let i=0;i<34;i++){ if (c[i]>=3) m++; else if (c[i]===2) p++; }
+  m = Math.min(m,4);
+  if (p===0) return 8-2*m;
+  return 8 - 2*m - Math.min(p-1, 4-m) - 1;
+}
+function shPairs(c, melds){
+  if (melds.length) return INF;
+  let pairs=0, kinds=0; for (let i=0;i<34;i++){ if (c[i]>=1) kinds++; if (c[i]>=2) pairs++; }
+  return 6 - pairs + Math.max(0, 7-kinds);
+}
+function shOrphans(c, melds){
+  if (melds.length) return INF;
+  let k=0, pr=0; for (const i of ORPHANS){ if (c[i]) k++; if (c[i]>=2) pr=1; }
+  return 13 - k - pr;
+}
+
+/* ================= Targets (hands to aim for) ================= */
+const TARGETS = [];
+[true,false].forEach(full => [0,1,2].forEach(s => TARGETS.push({
+  key:(full?'ff':'hf')+s, kind:'flush', suit:s, full, honor:!full, open:true,
+  cn: full?'清一色':'混一色', en: `${full?'Full Flush':'Half Flush'} · ${SUITS[s].en}`, base: full?7:3,
+  keep: full?`Keep only ${SUITS[s].en}.`:`Keep ${SUITS[s].en} and honour tiles (winds/dragons).`})));
+TARGETS.push({key:'pungs',kind:'pungs',open:true,cn:'對對糊',en:'All Pungs',base:3,keep:'Keep pairs and triplets; pung discards you need.'});
+TARGETS.push({key:'pairs',kind:'pairs',open:false,cn:'七對子',en:'Seven Pairs',base:4,keep:'Collect pairs and stay concealed — never claim.'});
+TARGETS.push({key:'orphans',kind:'orphans',open:false,cn:'十三么',en:'Thirteen Orphans',base:13,keep:'Keep one of every 1, 9, wind and dragon.'});
+TARGETS.push({key:'chows',kind:'chows',open:false,cn:'平糊',en:'All Chows (concealed)',base:1,keep:'Build runs (sequences) and stay concealed.'});
+TARGETS.push({key:'std',kind:'std',open:true,cn:'雞糊',en:'Basic hand (bonus fan only)',base:0,keep:'This "chicken hand" has no pattern of its own and scores 0 fan — any 4 sets + a pair. It only reaches 3 fan through bonuses: dragon / seat-wind / round-wind pungs, flowers, staying concealed, self-drawing.'});
+
+const tileOk = (tg,t) => tg.kind!=='flush' || suitOf(t)===tg.suit || (tg.honor && t>=27);
+function targetShanten(tg, c, melds){
+  switch (tg.kind){
+    case 'std': return shStd(c, melds.length, false);
+    case 'flush': {
+      for (const m of melds) if (!tileOk(tg, m.t)) return INF;
+      const f = c.map((v,i)=> tileOk(tg,i)?v:0);
+      return shStd(f, melds.length, false);
+    }
+    case 'pungs': return shPungs(c, melds);
+    case 'chows': if (melds.length) return INF; return shStd(c, 0, true);
+    case 'pairs': return shPairs(c, melds);
+    case 'orphans': return shOrphans(c, melds);
+  }
+  return INF;
+}
+function fitsTarget(tg, t, c){
+  switch (tg.kind){
+    case 'flush': return tileOk(tg,t);
+    case 'pungs': case 'pairs': return c[t]>=2;
+    case 'orphans': return ORPHANS.includes(t);
+    case 'chows': return t<27;
+    default: return true;
+  }
+}
+
+/* ================= Scoring (fan) ================= */
+const FAN_PTS = [1,2,4,8,16,24,32,48,64,96,128,192,256,256];
+function decomps(c, need){
+  const out = []; let total=0; for (const v of c) total+=v;
+  if (total !== need*3+2) return out;
+  for (let i=0;i<34;i++){
+    if (c[i]<2) continue; c[i]-=2; const sets=[];
+    (function rec(j,n){
+      while (j<34 && !c[j]) j++;
+      if (j===34){ if (n===0) out.push({pair:i, sets:sets.slice()}); return; }
+      if (n===0) return;
+      if (c[j]>=3){ c[j]-=3; sets.push({kind:'pung',t:j}); rec(j,n-1); sets.pop(); c[j]+=3; }
+      if (j<27 && j%9<=6 && c[j+1] && c[j+2]){ c[j]--;c[j+1]--;c[j+2]--; sets.push({kind:'chow',t:j}); rec(j,n-1); sets.pop(); c[j]++;c[j+1]++;c[j+2]++; }
+    })(0,need);
+    c[i]+=2;
+  }
+  return out;
+}
+const F = (en,cn,fan) => ({en,cn,fan});
+function commonItems(x, concealed, isPairs){
+  const it = [];
+  if (x.selfDrawn) it.push(F('Self-drawn','自摸',1));
+  if (concealed && !isPairs) it.push(F('Concealed hand','門前清',1));
+  if (x.lastTile) it.push(x.selfDrawn ? F('Win on the last tile','海底撈月',1) : F('Win on the last discard','河底撈魚',1));
+  if (x.afterKong>=2 && x.selfDrawn) it.push(F('Win after two kongs in a row','槓上槓',8));
+  else if (x.afterKong && x.selfDrawn) it.push(F('Win on kong replacement','槓上開花',1));
+  if (x.robKong) it.push(F('Robbing a kong','搶槓',1));
+  if (S.flowers){
+    if (!x.flowers.length) it.push(F('No flowers','無花',1));
+    else {
+      const fl = x.flowers.filter(f=>f<38), se = x.flowers.filter(f=>f>=38);
+      if (x.flowers.length===8) it.push(F('All eight flowers & seasons','八仙過海',13));
+      else if (fl.length===4) it.push(F('Complete set of flowers','一台花',2)); else if (fl.includes(34+x.seat)) it.push(F('Own flower','正花',1));
+      if (x.flowers.length===8) {}
+      else if (se.length===4) it.push(F('Complete set of seasons','一台花',2)); else if (se.includes(38+x.seat)) it.push(F('Own season','正花',1));
+    }
+  }
+  return it;
+}
+function flushItems(all, it){
+  const suits = new Set(all.filter(t=>t<27).map(suitOf)), hon = all.some(t=>t>=27);
+  if (suits.size===0) it.push(F('All honours','字一色',10));
+  else if (suits.size===1) it.push(hon ? F('Half flush','混一色',3) : F('Full flush','清一色',7));
+}
+function scoreHand(x){
+  // x: {c, melds, flowers, seat, prev, selfDrawn, winTile, lastTile, afterKong, heavenly}
+  const c = x.c, melds = x.melds, cands = [];
+  const concealed = melds.every(m=>m.concealed);
+  let total=0; for (const v of c) total+=v;
+  if (!melds.length && total===14){
+    let k=0, pr=0; for (const i of ORPHANS){ if (c[i]) k++; if (c[i]===2) pr++; }
+    if (k===13 && pr===1) cands.push([F('Thirteen orphans','十三么',13)]);
+    let pairs=0; for (let i=0;i<34;i++) if (c[i]===2) pairs++;
+    if (pairs===7){
+      const all=[]; c.forEach((v,i)=>{ if (v) all.push(i); });
+      const it=[F('Seven pairs','七對子',4)]; flushItems(all, it);
+      cands.push(it.concat(commonItems(x, concealed, true)));
+    }
+  }
+  const need = 4 - melds.length;
+  for (const d of decomps(c, need)){
+    const sets = melds.map(m=>({kind:m.kind==='chow'?'chow':'pung', t:m.t, concealed:m.concealed}))
+      .concat(d.sets.map(s=>({kind:s.kind, t:s.t, concealed:true, hand:true})));
+    if (!x.selfDrawn && x.winTile!=null){
+      const inOther = d.pair===x.winTile || d.sets.some(s=>s.kind==='chow' && x.winTile>=s.t && x.winTile<=s.t+2);
+      if (!inOther){ const ps = sets.find(s=>s.hand && s.kind==='pung' && s.t===x.winTile); if (ps) ps.concealed=false; }
+    }
+    const all=[]; sets.forEach(s=> s.kind==='pung' ? all.push(s.t) : all.push(s.t,s.t+1,s.t+2)); all.push(d.pair);
+    const it=[];
+    const allPung = sets.every(s=>s.kind==='pung'), allChow = sets.every(s=>s.kind==='chow');
+    const numbers = all.filter(t=>t<27), hon = all.some(t=>t>=27);
+    const allTerms = numbers.length===all.length && all.every(isTerm);
+    if (allTerms) it.push(F('All terminals','清么九',10));
+    else flushItems(all, it);
+    if (allPung && numbers.length && !allTerms) it.push(F('All pungs','對對糊',3));
+    if (allPung && hon && numbers.length && all.every(t=>t>=27||isTerm(t))) it.push(F('Mixed terminals & honours','混么九',1));
+    if (allChow) it.push(F('All chows','平糊',1));
+    const dp = sets.filter(s=>s.kind==='pung' && s.t>=31), wp = sets.filter(s=>s.kind==='pung' && s.t>=27 && s.t<=30);
+    if (dp.length===3) it.push(F('Great three dragons','大三元',8));
+    else if (dp.length===2 && d.pair>=31) it.push(F('Small three dragons','小三元',5));
+    else dp.forEach(s=> it.push(F(`Pung of ${HONORS[s.t-27].en}`,'番子 '+HONORS[s.t-27].cn,1)));
+    if (wp.length===4) it.push(F('Great four winds','大四喜',13));
+    else if (wp.length===3 && d.pair>=27 && d.pair<=30) it.push(F('Small four winds','小四喜',6));
+    else wp.forEach(s=>{
+      if (s.t===27+x.seat) it.push(F(`Seat wind (${HONORS[s.t-27].en})`,'門風 '+HONORS[s.t-27].cn,1));
+      if (s.t===27+x.prev) it.push(F(`Round wind (${HONORS[s.t-27].en})`,'圈風 '+HONORS[s.t-27].cn,1));
+    });
+    if (allPung && sets.filter(s=>s.concealed).length===4) it.push(F('Four concealed pungs','坎坎糊',13));
+    if (melds.length===4 && melds.every(m=>m.kind==='kong')) it.push(F('Four kongs','十八羅漢',13));
+    if (!melds.length && numbers.length===14){
+      const s = suitOf(numbers[0]);
+      if (numbers.every(t=>suitOf(t)===s)){
+        const base=[3,1,1,1,1,1,1,1,3]; let extra=0, ok=true;
+        for (let i=0;i<9;i++){ const d2 = c[s*9+i]-base[i]; if (d2<0) ok=false; extra+=Math.max(0,d2); }
+        if (ok && extra===1) it.push(F('Nine gates','九子連環',13));
+      }
+    }
+    cands.push(it.concat(commonItems(x, concealed, false)));
+  }
+  if (!cands.length) return null;
+  if (x.heavenly) cands.push([F('Heavenly hand','天糊',13)]);
+  if (x.earthly) cands.push([F('Earthly hand','地糊',13)]);
+  let best=null, bf=-1;
+  for (const it of cands){ const f = it.reduce((a,b)=>a+b.fan,0); if (f>bf){ bf=f; best=it; } }
+  const fan = Math.min(13, bf);
+  return {fan, raw:bf, items:best, ok: fan>=3};
+}
+
+/* ================= Game state ================= */
+const DEFAULTS = {aiStyle:'mixed', ai:3, mode:'hover', speed:'normal', flowers:true, tips:true, scale:1.2};
+let S = {...DEFAULTS};
+let savedS = {}; try { savedS = JSON.parse(localStorage.getItem('mjcoach-settings')||'{}'); Object.assign(S, savedS); } catch(e){}
+if (savedS.scale==null && innerWidth < 700) S.scale = 1;   // phones: start at 100%
+const saveS = () => { try { localStorage.setItem('mjcoach-settings', JSON.stringify(S)); } catch(e){} };
+const POS = {2:['bottom','top'], 3:['bottom','right','left'], 4:['bottom','right','top','left']};
+const SPEED = {slow:1100, normal:650, fast:250};
+const G = {players:[], wall:[], center:[], dealer:0, prevWind:0, rot:0, handNo:0, handId:0, phase:'idle', log:[], discardSeq:0};
+const CANCEL = {cancel:true};
+const N = () => G.players.length;
+const seatOf = p => (p.idx - G.dealer + N()) % N();
+const sleep = ms => new Promise(r=>setTimeout(r, ms));
+function counts(hand){ const c = new Array(34).fill(0); for (const t of hand) c[t]++; return c; }
+function shuffle(a){ for (let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function removeOne(arr, t){ const i = arr.indexOf(t); if (i>=0) arr.splice(i,1); }
+function log(html){ G.log.unshift(html); if (G.log.length>80) G.log.pop(); }
+function toast(html){ const el=$('#toast'); el.innerHTML=html; el.style.display='block'; clearTimeout(toast.t); toast.t=setTimeout(()=>el.style.display='none', 2600); }
+function guard(id){ if (id!==G.handId) throw CANCEL; }
+
+function buildWall(){
+  const w=[]; for (let t=0;t<34;t++) for (let k=0;k<4;k++) w.push(t);
+  if (S.flowers) for (let t=34;t<42;t++) w.push(t);
+  return shuffle(w);
+}
+function newGame(){
+  const n = S.ai+1; G.players=[];
+  const styles = assignStyles(n-1);
+  for (let i=0;i<n;i++) G.players.push({idx:i, human:i===0, name:i===0?'You':`AI ${i}`, style:i?styles[i-1]:null, score:0, hand:[], melds:[], flowers:[]});
+  G.pos = POS[n]; G.dealer=0; G.prevWind=0; G.rot=0; G.handNo=0;
+  startHand();
+}
+function startHand(){
+  G.handId++; const id = G.handId;
+  if (G.waiting){ const w=G.waiting; G.waiting=null; w(CANCEL); }
+  $('#endModal').classList.remove('show');
+  G.handNo++;
+  G.players.forEach(p=>{ p.hand=[]; p.melds=[]; p.flowers=[]; p.discards=[]; });
+  G.wall = buildWall(); G.center=[]; G.lastDiscard=null; G.justDrew=null; G.turnCount=0; G.noClaims=true;
+  G.reveal=false; G.hint=null; G.focus=null; G.tray=null; G.trayRemoveId=null; G.selItem=null; G.review=[]; G.drawnMerged=false; G.log=[]; G.phase='wait'; G.claim=null; G.turnCtx=null; G.coach=null;
+  const n=N();
+  for (let r=0;r<13;r++) for (let k=0;k<n;k++) G.players[(G.dealer+k)%n].hand.push(G.wall.shift());
+  G.players[G.dealer].hand.push(G.wall.shift());
+  for (let k=0;k<n;k++){
+    const p = G.players[(G.dealer+k)%n]; let f;
+    while ((f = p.hand.findIndex(isFlower)) >= 0){
+      p.flowers.push(p.hand.splice(f,1)[0]);
+      let t; do { t = G.wall.pop(); if (isFlower(t)) p.flowers.push(t); } while (isFlower(t));
+      p.hand.push(t);
+    }
+  }
+  G.justDrew = {p:G.dealer, t:G.players[G.dealer].hand[G.players[G.dealer].hand.length-1]};
+  G.wallStart = G.wall.length;
+  log(`<b>Hand ${G.handNo}</b> — ${G.players[G.dealer].name} ${G.players[G.dealer].human?'are':'is'} dealer (東). Round wind: ${HONORS[G.prevWind].cn} ${HONORS[G.prevWind].en}.`);
+  render();
+  handLoop(id).catch(e=>{ if (e!==CANCEL) console.error(e); });
+}
+
+function drawFor(p, back){
+  while (true){
+    if (!G.wall.length) return false;
+    const t = back ? G.wall.pop() : G.wall.shift();
+    if (isFlower(t)){
+      p.flowers.push(t); back = true;
+      log(`${p.name} drew bonus tile ${mini(t)} ${BONUS[t-34].en} — replacement draw.`);
+      continue;
+    }
+    p.hand.push(t); G.justDrew = {p:p.idx, t}; return true;
+  }
+}
+function findKongs(p){
+  const c = counts(p.hand), out=[];
+  for (let t=0;t<34;t++) if (c[t]===4) out.push({t, kind:'concealed'});
+  for (const m of p.melds) if (m.kind==='pung' && c[m.t]) out.push({t:m.t, kind:'add'});
+  return out;
+}
+function turnContext(p, afterKong, drew){
+  const ctx = {drew, afterKong, kongs:[], win:null};
+  if (drew){
+    ctx.win = scoreFor(p, null, {selfDrawn:true, winTile:G.justDrew?.t, afterKong, lastTile:G.wall.length===0,
+      heavenly: p.idx===G.dealer && G.turnCount===0 && G.noClaims});
+    if (G.wall.length) ctx.kongs = findKongs(p);
+  }
+  if (S.flowers && p.flowers.length===8 && !(ctx.win && ctx.win.ok))
+    ctx.win = {fan:13, raw:13, ok:true, items:[F('All eight flowers & seasons — instant win','八仙過海',13)]};
+  return ctx;
+}
+function scoreFor(p, extra, o){
+  const c = counts(p.hand); if (extra!=null) c[extra]++;
+  return scoreHand({c, melds:p.melds, flowers:p.flowers, seat:seatOf(p), prev:G.prevWind, ...o});
+}
+function doSelfKong(p, k){
+  if (k.kind==='concealed'){
+    for (let i=0;i<4;i++) removeOne(p.hand, k.t);
+    p.melds.push({kind:'kong', t:k.t, tiles:[k.t,k.t,k.t,k.t], concealed:true});
+  } else {
+    removeOne(p.hand, k.t);
+    const m = p.melds.find(m=>m.kind==='pung' && m.t===k.t); m.kind='kong'; m.tiles.push(k.t);
+  }
+  log(`${p.name} declared a ${k.kind==='concealed'?'concealed ':''}kong of ${mini(k.t)}.`);
+  toast(`${p.name}: Kong! 槓`);
+}
+function placeDiscard(t, from){
+  const pond = $('#pond'), W = pond.clientWidth||600, H = pond.clientHeight||300;
+  let best=null, bd=-1;
+  for (let k=0;k<36;k++){
+    const x = .04+Math.random()*.92, y = .07+Math.random()*.86;
+    let md = 1e9;
+    for (const d of G.center){ const dx=(d.x-x)*W, dy=(d.y-y)*H; md = Math.min(md, Math.hypot(dx,dy)); }
+    const score = Math.min(md, 70) + Math.random()*8 - Math.hypot((x-.5)*W,(y-.5)*H)*.03;
+    if (score>bd){ bd=score; best={x,y}; }
+  }
+  const d = {t, from, id:++G.discardSeq, x:best.x, y:best.y, r:Math.round(Math.random()*90-45), fresh:true};
+  G.center.push(d); return d;
+}
+function discard(p, t){
+  removeOne(p.hand, t);
+  (p.discards = p.discards || []).push({t, turn:G.turnCount, wall:G.wall.length});
+  const d = placeDiscard(t, p.idx);
+  G.lastDiscard = d; G.justDrew = null;
+  log(`${p.name} discarded ${mini(t)} ${tileName(t)}.`);
+}
+
+async function handLoop(id){
+  const n = N();
+  let cur = G.dealer, needDraw=false, afterKong=false, drew=true;
+  while (true){
+    const p = G.players[cur]; G.cur = cur;
+    if (needDraw){ if (!drawFor(p,false)) return endDraw(); drew = true; }
+    needDraw = true;
+    while (true){
+      const ctx = turnContext(p, afterKong, drew);
+      let act;
+      if (p.human){ act = await humanTurn(ctx); guard(id); }
+      else { G.phase='wait'; render(); await sleep(SPEED[S.speed]); guard(id); act = aiTurn(p, ctx); }
+      if (act.type==='win') return endWin(cur, null, ctx.win);
+      if (act.type==='kong'){
+        if (act.k.kind==='add'){
+          const rob = await resolveRob(id, cur, act.k.t); guard(id);
+          if (rob){ removeOne(p.hand, act.k.t); G.lastDiscard = {t:act.k.t, id:-1}; return endWin(rob.player, cur, rob.win); }
+        }
+        doSelfKong(p, act.k); afterKong = (+afterKong||0) + 1;
+        if (!drawFor(p,true)) return endDraw();
+        drew = true; render(); continue;
+      }
+      discard(p, act.t); afterKong=false; break;
+    }
+    G.turnCount++; G.phase='wait'; G.hint=null;
+    if (G.players[0] && !p.human) {}
+    render();
+    const claim = await resolveClaims(id, cur, G.lastDiscard.t);
+    guard(id);
+    if (!claim){ cur = (cur+1)%n; continue; }
+    if (claim.type==='win') return endWin(claim.player, cur, claim.win);
+    applyClaim(claim); G.noClaims=false;
+    cur = claim.player;
+    if (claim.type==='kong'){ if (!drawFor(G.players[cur], true)) return endDraw(); afterKong=true; drew=true; }
+    else { afterKong=false; drew=false; }
+    needDraw=false;
+  }
+}
+
+function claimOptions(q, from, t){
+  const p = G.players[q], c = counts(p.hand), o = {};
+  const w = scoreFor(p, t, {selfDrawn:false, winTile:t, lastTile:G.wall.length===0,
+    robKong: !!G.robbing, earthly: !G.robbing && from===G.dealer && G.turnCount===1 && G.noClaims});
+  if (w) o.win = w;
+  if (c[t]>=2) o.pung = true;
+  if (c[t]>=3 && G.wall.length) o.kong = true;
+  if (q === (from+1)%N() && t<27){
+    const ch=[], s0 = Math.floor(t/9)*9;
+    for (const st of [t-2,t-1,t]){
+      if (st<s0 || st+2>s0+8) continue;
+      const others = [st,st+1,st+2].filter(x=>x!==t);
+      const cc = c.slice(); let ok=true; for (const x of others){ if (cc[x]>0) cc[x]--; else ok=false; }
+      if (ok) ch.push(st);
+    }
+    if (ch.length) o.chows = ch;
+  }
+  const actionable = (o.win && o.win.ok) || o.pung || o.kong || o.chows;
+  return {o, actionable};
+}
+async function resolveClaims(id, from, t){
+  const n = N(), decisions = [];
+  for (let k=1;k<n;k++){
+    const q = (from+k)%n, p = G.players[q];
+    const {o, actionable} = claimOptions(q, from, t);
+    if (p.human && o.win && !o.win.ok) log(`<span class="muted">Coach: ${mini(t)} would complete your hand, but it's only ${o.win.fan} fan — you need 3.</span>`);
+    if (!actionable) continue;
+    let ch;
+    if (p.human){ ch = await humanClaim(o, t, from); guard(id); }
+    else ch = aiClaim(p, t, o);
+    if (ch && ch.type!=='pass') decisions.push({...ch, player:q, order:k});
+  }
+  if (!decisions.length){ await sleep(Math.min(250, SPEED[S.speed]/2)); guard(id); return null; }
+  const pick = type => decisions.filter(d=>d.type===type).sort((a,b)=>a.order-b.order)[0];
+  const d = pick('win') || pick('kong') || pick('pung') || pick('chow');
+  if (d.type==='win'){ d.win = claimOptions(d.player, from, t).o.win; }
+  return d;
+}
+// Another player adds a tile to their exposed pung: anyone who wins on that tile may "rob the kong".
+async function resolveRob(id, from, t){
+  const n = N(); G.robbing = true;
+  try {
+    for (let k=1;k<n;k++){
+      const q = (from+k)%n, p = G.players[q];
+      const {o} = claimOptions(q, from, t);
+      if (!(o.win && o.win.ok)) continue;
+      const opts = {win:o.win};
+      let ch;
+      if (p.human){ log(`${G.players[from].name} is adding ${mini(t)} to a kong — you can <b>rob the kong 搶槓</b>!`); ch = await humanClaim(opts, t, from); guard(id); }
+      else ch = aiClaim(p, t, opts);
+      if (ch && ch.type==='win'){ log(`${p.name} robbed the kong 搶槓!`); return {player:q, win:o.win}; }
+    }
+    return null;
+  } finally { G.robbing = false; }
+}
+function applyClaim(cl){
+  const p = G.players[cl.player], d = G.lastDiscard, t = d.t;
+  G.center = G.center.filter(x=>x.id!==d.id);
+  if (cl.type==='pung'){ removeOne(p.hand,t); removeOne(p.hand,t); p.melds.push({kind:'pung',t,tiles:[t,t,t],concealed:false}); }
+  else if (cl.type==='kong'){ for (let i=0;i<3;i++) removeOne(p.hand,t); p.melds.push({kind:'kong',t,tiles:[t,t,t,t],concealed:false}); }
+  else if (cl.type==='chow'){ const st=cl.start; [st,st+1,st+2].filter(x=>x!==t).forEach(x=>removeOne(p.hand,x)); p.melds.push({kind:'chow',t:st,tiles:[st,st+1,st+2],concealed:false}); }
+  const label = {pung:'Pung! 碰', kong:'Kong! 槓', chow:'Chow! 上'}[cl.type];
+  log(`${p.name} claimed ${mini(t)} — ${label}`);
+  toast(`${p.name}: ${label}`);
+  G.lastDiscard = null;
+}
+
+function rotateDealer(){
+  G.dealer = (G.dealer+1)%N(); G.rot++;
+  if (G.rot % N() === 0) G.prevWind = (G.prevWind+1)%4;
+}
+function endWin(w, from, win){
+  G.phase='over'; G.reveal=true;
+  const p = G.players[w], n=N();
+  let winTile;
+  if (from!=null){ winTile = G.lastDiscard.t; G.center = G.center.filter(x=>x.id!==G.lastDiscard.id); p.hand.push(winTile); }
+  else winTile = G.justDrew?.t;
+  const pts = FAN_PTS[win.fan];
+  let payText;
+  if (from==null){
+    G.players.forEach(q=>{ if (q!==p){ q.score -= pts; p.score += pts; } });
+    payText = `Self-drawn: every other player pays ${pts}.`;
+  } else {
+    G.players[from].score -= pts*2; p.score += pts*2;
+    payText = `${G.players[from].name} discarded the winning tile and ${G.players[from].human?'pay':'pays'} ${pts*2} (double).`;
+  }
+  const dealerStays = w===G.dealer;
+  log(`<b>${p.name} won</b> with ${win.fan} fan${from==null?' (self-drawn)':` on ${G.players[from].human?'your':G.players[from].name+"'s"} discard`}.`);
+  render();
+  const handTiles = p.hand.slice().sort((a,b)=>a-b);
+  let wi = -1; if (winTile!=null) wi = handTiles.indexOf(winTile);
+  const body = `
+    <h2>${p.human?'🎉 You win!':`${p.name} wins`} <span style="font-size:16px">${from==null?'自摸 self-drawn':'食糊 on a discard'}</span></h2>
+    <p class="lead">${win.fan} fan${win.raw>13?' (limit 爆棚)':''} · ${pts} points base</p>
+    <div class="endhand"><div class="grp">${handTiles.map((t,i)=>tileHTML(t, 'md'+(i===wi?' winning':''))).join('')}</div>
+      ${p.melds.map(m=>`<div class="grp">${m.tiles.map(t=>tileHTML(t,'md')).join('')}</div>`).join('')}
+      ${p.flowers.length?`<div class="grp">${p.flowers.map(t=>tileHTML(t,'sm')).join('')}</div>`:''}</div>
+    <table class="fans">${win.items.map(i=>`<tr><td class="cn">${i.cn}</td><td>${i.en}</td><td class="f">${i.fan}</td></tr>`).join('')}
+      <tr class="tot"><td></td><td>Total${win.raw>13?' (capped at 13)':''}</td><td class="f">${win.fan} fan</td></tr></table>
+    <div class="pay">${payText} ${dealerStays?'Dealer keeps the deal.':'The deal passes on.'}</div>
+    <div class="pay">${G.players.map(q=>`${q.name}: <b>${q.score}</b>`).join(' · ')}</div>
+    <div class="mbtns"><button class="mbtn sec2" onclick="$('#endModal').classList.remove('show')">Look at the table</button><button class="mbtn sec2" onclick="openReview(true)">📝 Review with coach</button><button class="mbtn" onclick="startHand()">Next hand ▶</button></div>`;
+  if (!dealerStays) rotateDealer();
+  $('#endBody').innerHTML = body; $('#endModal').classList.add('show');
+}
+function endDraw(){
+  G.phase='over'; G.reveal=true;
+  log(`<b>Draw</b> — the wall is exhausted.`);
+  render();
+  $('#endBody').innerHTML = `<h2>流局 Draw game</h2><p class="lead">The wall ran out before anyone won. The dealer keeps the deal.</p>
+    <div class="pay">${G.players.map(q=>`${q.name}: <b>${q.score}</b>`).join(' · ')}</div>
+    <div class="mbtns"><button class="mbtn sec2" onclick="$('#endModal').classList.remove('show')">Look at the table</button><button class="mbtn sec2" onclick="openReview(true)">📝 Review with coach</button><button class="mbtn" onclick="startHand()">Next hand ▶</button></div>`;
+  $('#endModal').classList.add('show');
+}
+
+/* ================= Analysis (shared by AI + coach) ================= */
+function unseenFor(p){
+  const u = new Array(34).fill(4);
+  p.hand.forEach(t=>u[t]--);
+  G.players.forEach(q=>q.melds.forEach(m=>m.tiles.forEach(t=>u[t]--)));
+  G.center.forEach(d=>u[d.t]--);
+  return u.map(x=>Math.max(0,x));
+}
+function extrasFor(p){
+  const c = counts(p.hand), seat = seatOf(p), items=[];
+  let flowers=0, honor=0, noFlower=0, pKeep=1;
+  if (S.flowers){
+    if (!p.flowers.length){
+      flowers++; noFlower = 1;
+      // chance you still have no flowers when the hand ends (bonus tiles left in the wall vs. your draws)
+      const flLeft = 8 - G.players.reduce((a,q)=>a+q.flowers.length,0);
+      const wall = Math.max(1, G.wall.length), myDraws = Math.floor(G.wall.length / N());
+      pKeep = Math.pow(Math.max(0, 1 - flLeft/wall), myDraws);
+      items.push(F(`No flowers (so far — ~${Math.round(pKeep*100)}% chance it lasts)`,'無花',1));
+    }
+    const fl = p.flowers.filter(f=>f<38), se = p.flowers.filter(f=>f>=38);
+    if (fl.length===4){ flowers+=2; items.push(F('All four flowers','一台花',2)); } else if (fl.includes(34+seat)){ flowers++; items.push(F('Own flower','正花',1)); }
+    if (se.length===4){ flowers+=2; items.push(F('All four seasons','一台花',2)); } else if (se.includes(38+seat)){ flowers++; items.push(F('Own season','正花',1)); }
+  }
+  const hasP = t => c[t]>=3 || p.melds.some(m=>m.t===t && m.kind!=='chow');
+  for (let t=31;t<34;t++) if (hasP(t)){ honor++; items.push(F(`Pung of ${HONORS[t-27].en}`,'番子 '+HONORS[t-27].cn,1)); }
+  if (hasP(27+seat)){ honor++; items.push(F(`Seat wind pung`,'門風 '+HONORS[seat].cn,1)); }
+  if (hasP(27+G.prevWind)){ honor++; items.push(F(`Round wind pung`,'圈風 '+HONORS[G.prevWind].cn,1)); }
+  const concealed = p.melds.every(m=>m.concealed) ? 1 : 0;
+  // honour pairs that could become fan
+  const pairs = [];
+  for (let t=27;t<34;t++){
+    if (c[t]===2 && (t>=31 || t===27+seat || t===27+G.prevWind)) pairs.push(t);
+  }
+  return {flowers, honor, concealed, items, pairs, noFlower, pKeep};
+}
+// Probability a hand estimated at `fan` really reaches 3 fan: the 無花 "no flowers" point is at risk
+// (you may still draw a flower), and a self-draw (自摸 +1) happens in roughly 30% of wins.
+const SELF_DRAW_P = .3;
+function fanWeight(fan, ex){
+  const nf = ex.noFlower||0, base = fan - nf, pk = nf ? ex.pKeep : 0;
+  if (base >= 3) return 1;
+  if (base === 2) return 1 - (1-pk)*(1-SELF_DRAW_P);
+  if (base === 1) return pk*SELF_DRAW_P;
+  return 0;
+}
+function targetFan(tg, ex){
+  switch (tg.kind){
+    case 'flush': return tg.base + ex.flowers + (tg.full?0:ex.honor) + ex.concealed;
+    case 'pungs': return tg.base + ex.flowers + ex.honor + ex.concealed;
+    case 'pairs': return tg.base + ex.flowers;
+    case 'orphans': return 13;
+    case 'chows': return tg.base + ex.flowers + 1;
+    case 'std': return ex.flowers + ex.honor + ex.concealed;
+  }
+  return 0;
+}
+function binomTail(n, p, k){
+  if (k<=0) return 1; if (n<k || p<=0) return 0;
+  let term = Math.pow(1-p, n), cdf = 0;
+  for (let i=0;i<k;i++){ cdf += term; term = term * (n-i)/(i+1) * p/(1-p); }
+  return Math.max(0, Math.min(1, 1-cdf));
+}
+function estProb(s, u, U, draws, open){
+  if (s>=INF) return 0;
+  const k = s+1; if (k<=0) return 1;
+  // Rough model: each own draw (plus some claim chances for open hands) improves the hand with
+  // probability ~ useful/unseen, discounted for multi-step progress (later steps get harder).
+  // open hands can also claim opponents' discards: more opponents = more chances
+  const n = Math.round(draws * (open ? 1 + .33*(N()-1) : 1));
+  const r = u/Math.max(U,1);
+  const p = s===0 ? Math.min(.9, r) : Math.min(.3, r*.6) * Math.pow(.85, s-1);
+  return binomTail(n, p, k);
+}
+function ukeire(tg, c, melds, unseen, s0){
+  let u=0; const tiles=[];
+  for (let t=0;t<34;t++){
+    if (!unseen[t] || c[t]>=4) continue;
+    c[t]++; const s = targetShanten(tg, c, melds); c[t]--;
+    if (s < s0){ u += unseen[t]; tiles.push(t); }
+  }
+  return {u, tiles};
+}
+function evalTarget(tg, c, melds, unseen, U, draws, has14, ex){
+  let s, u=0, discards=[], useful=[];
+  if (has14){
+    const ss=[]; let minS=INF;
+    for (let d=0;d<34;d++){ if (!c[d]) continue; c[d]--; const v = targetShanten(tg,c,melds); c[d]++; ss.push([d,v]); if (v<minS) minS=v; }
+    if (minS>=INF) return null;
+    if (minS===-1) { s=-1; }
+    else {
+      let bu=-1;
+      for (const [d,v] of ss){ if (v!==minS) continue; c[d]--; const r = ukeire(tg,c,melds,unseen,v); c[d]++;
+        if (r.u>bu){ bu=r.u; discards=[d]; useful=r.tiles; } else if (r.u===bu) discards.push(d); }
+      s = minS; u = bu;
+    }
+    if (s===-1){ s = targetShanten(tg,c,melds); }
+  } else {
+    s = targetShanten(tg,c,melds); if (s>=INF) return null;
+    const r = ukeire(tg,c,melds,unseen,s); u=r.u; useful=r.tiles;
+  }
+  const fan = targetFan(tg, ex);
+  const fanSelf = fan + 1;
+  const prob = s<0 ? 1 : estProb(s, u, U, draws, tg.open);
+  const w = tg.kind==='orphans' ? 1 : fanWeight(fan, ex);
+  const risky = !!ex.noFlower && fan>=3 && fan-ex.noFlower<3;   // only 3 fan if you never draw a flower
+  return {tg, s, u, discards, useful, prob, fan, w, risky};
+}
+function readyOptions(p, c, has14, unseen){
+  const out=[];
+  const tryIt = d => {
+    if (Math.min(shStd(c,p.melds.length,false), shPairs(c,p.melds), shOrphans(c,p.melds)) !== 0) return;
+    const waits=[];
+    for (let t=0;t<34;t++){
+      if (c[t]>=4) continue; c[t]++;
+      const base = {c, melds:p.melds, flowers:p.flowers, seat:seatOf(p), prev:G.prevWind, winTile:t, lastTile:false, afterKong:false};
+      const wd = scoreHand({...base, selfDrawn:false});
+      if (wd){ const ws = scoreHand({...base, selfDrawn:true}); waits.push({t, fanD:wd.fan, fanS:ws.fan, left:unseen[t]}); }
+      c[t]--;
+    }
+    if (!waits.length) return;
+    const value = waits.reduce((a,w)=> a + w.left*(w.fanD>=3?1:(w.fanS>=3?.4:0)), 0);
+    out.push({d, waits, value});
+  };
+  if (has14){ for (let d=0;d<34;d++){ if (!c[d]) continue; c[d]--; tryIt(d); c[d]++; } }
+  else tryIt(null);
+  return out.sort((a,b)=>b.value-a.value);
+}
+function analyze(p, light){
+  const c = counts(p.hand), has14 = p.hand.length + 3*p.melds.length === 14;
+  const unseen = unseenFor(p), U = unseen.reduce((a,b)=>a+b,0);
+  const draws = Math.max(0, Math.floor(G.wall.length / N()));
+  const ex = extrasFor(p);
+  const all = TARGETS.map(tg=>evalTarget(tg, c, p.melds, unseen, U, draws, has14, ex)).filter(Boolean);
+  const ready = light ? [] : readyOptions(p, c, has14, unseen);
+  return {c, has14, unseen, U, draws, ex, all, ready};
+}
+/* AI personalities: each opponent weighs speed vs. hand size and risk differently. */
+const AI_STYLES = {
+  balanced:{cn:'穩', en:'Balanced', d:'Plays like the coach’s plan, but never plays safe.'},
+  speed:   {cn:'快', en:'Speedy', d:'Goes for the quickest 3-fan hand and claims a lot. Never plays safe — exposed sets pile up fast, so watch them.'},
+  big:     {cn:'大', en:'Big-hand hunter', d:'Chases flushes and high-fan hands and claims less. Wins less often, but bigger — a quiet hand with one suit missing from their discards is a warning.'},
+  safe:    {cn:'守', en:'Cautious', d:'Likes concealed hands and only claims to get ready. Switches to safe discards when someone looks close.'},
+  novice:  {cn:'新', en:'Beginner', d:'Makes loose discards and misses claims sometimes.'}};
+function assignStyles(n){
+  const mode = S.aiStyle || 'mixed';
+  if (mode==='balanced') return Array(n).fill('balanced');
+  if (mode==='easy') return Array(n).fill('novice');
+  return shuffle(['speed','big','safe','balanced']).slice(0,n);
+}
+function targetScore(x, style){
+  const f = style==='speed' ? 0 : style==='big' ? .3 : .04;
+  let sc = x.w * x.prob * (1 + x.fan*f) + x.w*((style==='speed'?.006:.002)*(8-x.s)) + x.u*1e-6;
+  if (style==='big' && x.fan<5 && G.wall.length>30) sc *= .6;
+  if (style==='safe' && !x.tg.open) sc *= 1.25;
+  return sc;
+}
+function pickTarget(A, style){
+  let best=null, bs=-1;
+  for (const x of A.all){ if (!x.w) continue; const sc = targetScore(x, style); if (sc>bs){ bs=sc; best=x; } }
+  if (!best){ for (const x of A.all) if (!best || x.s<best.s) best=x; }
+  return best;
+}
+function reasonForTarget(x){
+  const tg = x.tg;
+  const dist = x.s<=0 ? 'already ready' : `${x.s} tile${x.s>1?'s':''} away from ready`;
+  return `Aim for <b><span style="font-family:'Noto Serif SC'">${tg.cn}</span> ${tg.en}</b> (≈${x.fan} fan): you're ${dist}, with ${x.u} useful tiles still out there. ${tg.keep}`;
+}
+function planTurn(p, A){
+  A = A || analyze(p);
+  const r = A.ready[0];
+  if (r && r.value>0){
+    const good = r.waits.filter(w=>w.fanD>=3||w.fanS>=3);
+    return {discard:r.d, ready:r, A,
+      reason:`Discard ${mini(r.d)} <b>${tileName(r.d)}</b> — you'll be <b>ready (聽牌)</b> waiting on ${good.map(w=>mini(w.t)).join('')} (${good.reduce((a,w)=>a+w.left,0)} winning tiles left).`};
+  }
+  const best = pickTarget(A, p.style);
+  let ds = best ? best.discards.slice() : [];
+  if (!ds.length){ for (let d=0;d<34;d++) if (A.c[d]) ds.push(d); }
+  // tie-break: keep the overall shape strong, drop tiles with fewest live copies
+  let pick=ds[0], ps=INF;
+  for (const d of ds){ A.c[d]--; const s = shStd(A.c, p.melds.length, false)*100 + A.unseen[d]; A.c[d]++; if (s<ps){ ps=s; pick=d; } }
+  return {discard:pick, target:best, A, reason:`Discard ${mini(pick)} <b>${tileName(pick)}</b>. ${best?reasonForTarget(best):''}`};
+}
+function minAfterDiscard(tg, c, melds){
+  let m=INF; for (let d=0;d<34;d++){ if (!c[d]) continue; c[d]--; m=Math.min(m, targetShanten(tg,c,melds)); c[d]++; } return m;
+}
+function isValueHonor(t, p){ return t>=31 || t===27+seatOf(p) || t===27+G.prevWind; }
+// Spell out the fan maths of claiming vs. staying put, so the advice is checkable.
+function fanList(items){ return items.map(i=>`${i.cn.split(' ')[0]} ${i.en} +${i.fan}`).join(' + '); }
+function claimFanNote(p, t, o, A, tg){
+  const ex = A.ex, stayFan = targetFan(tg, ex);
+  const keep = ex.items.slice();                       // flowers + honour pungs you already have
+  let after = keep.slice(), lines = [];
+  const isPung = o.pung || o.kong;
+  if (isPung && isValueHonor(t,p)){
+    if (t>=31) after.push(F(`Pung of ${HONORS[t-27].en}`,'番子',1));
+    if (t===27+seatOf(p)) after.push(F('Seat wind pung','門風',1));
+    if (t===27+G.prevWind) after.push(F('Round wind pung','圈風',1));
+  }
+  const afterFan = after.reduce((a,i)=>a+i.fan,0);
+  const lost = [];
+  if (ex.concealed) lost.push('門前清 Concealed hand (+1) — any claim exposes your hand');
+  if (tg.kind==='chows' && isPung) lost.push('平糊 All Chows — every set must be a run, and a pung isn\'t one');
+  if (tg.kind==='pairs' || tg.kind==='orphans') lost.push(`${tg.cn} ${tg.en} — it must stay fully concealed`);
+  const stayItems = tg.kind==='chows' ? [F('All chows','平糊',1), ...(ex.concealed?[F('Concealed','門前清',1)]:[]), ...keep] : null;
+  lines.push(`<b>If you claim:</b> ${after.length?fanList(after):'no fan'} = <b>${afterFan} fan</b>${afterFan<3?` — under 3, so you could only win by drawing the tile yourself (自摸 +1)${afterFan+1<3?' and even that isn\'t enough':''}`:''}.`);
+  if (lost.length) lines.push(`<b>You'd give up:</b> ${lost.join('; ')}.`);
+  lines.push(`<b>If you pass:</b> ${stayItems?fanList(stayItems)+' = ':''}≈<b>${stayFan} fan</b> for ${tg.cn} ${tg.en}${stayFan>=3?' — enough to win on anyone\'s discard':''}.`);
+  return '<br>' + lines.join('<br>');
+}
+function claimDecision(p, t, o){
+  if (o.win && o.win.ok) return {type:'win', reason:`Take it — <b>Win!</b> ${mini(t)} completes your hand for <b>${o.win.fan} fan</b>.`};
+  const st = p.style;
+  if (st==='novice' && Math.random()<.25) return {type:'pass', reason:'Pass.'};
+  const A = analyze(p, true);
+  const best = pickTarget(A, st);
+  if (!best) return {type:'pass', reason:'Pass.'};
+  const minFan = st==='big' && G.wall.length>24 ? 4 : 3;
+  const tg = best.tg, c = A.c;
+  if (!tg.open) return {type:'pass', reason:`Pass — you're going for <b>${tg.cn} ${tg.en}</b>, which must stay concealed.${claimFanNote(p,t,o,A,tg)}`};
+  const exAfter = {...A.ex, concealed:0};
+  if ((o.pung||o.kong) && tg.kind!=='chows' && tileOk(tg,t)){
+    const val = isValueHonor(t,p);
+    const ex2 = {...exAfter, honor: exAfter.honor + (val?1:0)};
+    const fanAfter = targetFan(tg, ex2);
+    c[t]-=2; const s2 = minAfterDiscard(tg, c, [...p.melds,{kind:'pung',t,tiles:[t,t,t],concealed:false}]); c[t]+=2;
+    if (fanAfter>=minFan && (s2<best.s || (val && s2<=best.s) || (st==='speed' && s2<=best.s)) && (st!=='safe' || s2<=0 || val)){
+      const type = o.kong ? 'kong' : 'pung';
+      return {type, reason:`<b>${type==='kong'?'Kong 槓':'Pung 碰'}</b> the ${mini(t)} — it moves your <b>${tg.cn} ${tg.en}</b> closer (${best.s} → ${s2} away)${val?' and the honour pung is worth +1 fan':''}.`};
+    }
+  }
+  if (o.chows && (tg.kind==='flush' || tg.kind==='std') && tileOk(tg,t)){
+    const fanAfter = targetFan(tg, exAfter);
+    if (fanAfter>=minFan && (p.style!=='safe' || best.s<=1)){
+      for (const st of o.chows){
+        const others=[st,st+1,st+2].filter(x=>x!==t); others.forEach(x=>c[x]--);
+        const s2 = minAfterDiscard(tg, c, [...p.melds,{kind:'chow',t:st,tiles:[st,st+1,st+2],concealed:false}]);
+        others.forEach(x=>c[x]++);
+        if (s2<best.s) return {type:'chow', start:st, reason:`<b>Chow 上</b> ${mini(st)}${mini(st+1)}${mini(st+2)} — it speeds up your <b>${tg.cn} ${tg.en}</b> (${best.s} → ${s2} away).`};
+      }
+    }
+  }
+  let why = `it wouldn't bring your <b>${tg.cn} ${tg.en}</b> closer`;
+  if ((o.pung||o.chows) && tg.kind==='flush' && !tileOk(tg,t)) why = `${tileName(t)} doesn't fit your <b>${tg.cn} ${tg.en}</b>`;
+  else if (A.ex.concealed && targetFan(tg, exAfter) < 3) why = `claiming would lose the concealed-hand fan and drop you below 3 fan`;
+  const note = ((o.pung||o.kong) && isValueHonor(t,p)) || A.ex.concealed ? claimFanNote(p,t,o,A,tg) : '';
+  return {type:'pass', reason:`Pass — ${why}.${note}`};
+}
+function aiClaim(p, t, o){ const d = claimDecision(p, t, o); return d; }
+function kongAdvisable(p, k, plan){
+  if (plan.ready) return false;
+  const tg = plan.target ? plan.target.tg : TARGETS.find(x=>x.kind==='std');
+  if (tg.kind==='pairs' || tg.kind==='orphans' || tg.kind==='chows') return false;
+  if (!tileOk(tg, k.t)) return false;
+  const c = counts(p.hand); let melds;
+  if (k.kind==='concealed'){ c[k.t]-=4; melds=[...p.melds,{kind:'kong',t:k.t,tiles:[],concealed:true}]; }
+  else { c[k.t]-=1; melds=p.melds.map(m=>m.kind==='pung'&&m.t===k.t?{...m,kind:'kong'}:m); }
+  const sAfter = targetShanten(tg, c, melds);
+  const sBefore = minAfterDiscard(tg, counts(p.hand), p.melds);
+  return sAfter <= sBefore;
+}
+function aiTurn(p, ctx){
+  if (ctx.win && ctx.win.ok) return {type:'win'};
+  if (p.style==='novice' && Math.random()<.15){   // loose discard: anything that doesn't wreck the hand
+    const c = counts(p.hand), opts=[]; let m=INF;
+    for (const t of new Set(p.hand)){ c[t]--; const v = shStd(c, p.melds.length, false); c[t]++; opts.push([t,v]); m=Math.min(m,v); }
+    const ok = opts.filter(o=>o[1]<=m+1);
+    return {type:'discard', t: ok[Math.floor(Math.random()*ok.length)][0]};
+  }
+  let plan = planTurn(p);
+  if (p.style==='safe') plan = defensiveAdjust(p, plan, CAUTIOUS_DEF);
+  for (const k of ctx.kongs) if (kongAdvisable(p, k, plan)) return {type:'kong', k};
+  return {type:'discard', t:plan.discard};
+}
+
+/* ================= Human interaction ================= */
+function humanTurn(ctx){
+  G.phase='turn'; G.turnCtx=ctx; G.hint=null; G.drawnMerged=false; computeCoach(); render();
+  return new Promise(res=>G.waiting=res);
+}
+function humanClaim(o, t, from){
+  G.phase='claim'; G.claim={o,t,from}; G.hint=null; computeCoach(); render();
+  return new Promise(res=>G.waiting=res);
+}
+/* ================= Move review (grading) ================= */
+const GRADES = {
+  best:   {icon:'✅', label:'Best move', cls:'g-best'},
+  good:   {icon:'👍', label:'Good — not optimal, but pretty good', cls:'g-good'},
+  inacc:  {icon:'⚠️', label:'Inaccuracy', cls:'g-inacc'},
+  mistake:{icon:'❌', label:'Mistake', cls:'g-mistake'},
+  blunder:{icon:'💥', label:'Missed win', cls:'g-blunder'}};
+// Value of a 13-tile position = best (weighted) chance among hands worth ≥3 fan.
+function value13(p, c, A){
+  let best=null, bs=0, minS=INF;
+  for (const tg of TARGETS){
+    const x = evalTarget(tg, c, p.melds, A.unseen, A.U, A.draws, false, A.ex); if (!x) continue;
+    minS = Math.min(minS, x.s);
+    if (x.w){ const sc = targetScore(x); if (sc>bs){ bs=sc; best=x; } }
+  }
+  return {v:bs, x:best, s:minS};
+}
+function describeX(r){
+  if (!r.x) return `${r.s} away from any shape`;
+  const x = r.x, d = x.s<=0 ? 'ready' : `${x.s} away`;
+  return `<b>${x.tg.cn} ${x.tg.en}</b> ${d}, ${x.u} useful tiles (≈${pctTxt(x.prob*x.w)})`;
+}
+function gradeDiscard(p, ctx, chosen, kong){
+  const hint = getHint();
+  const snap = {hand: sortT(p.hand), drawn: ctx.drew && G.justDrew?.p===0 ? G.justDrew.t : null};
+  if (ctx.win && ctx.win.ok){
+    return {...snap, kind:'turn', chosen, rec:null, grade:'blunder',
+      title: kong ? `You declared a kong of ${mini(kong)}` : `You discarded ${mini(chosen)}`,
+      note:`Your hand was already complete for <b>${ctx.win.fan} fan</b> — you could have declared <b>Win 食糊</b>! Watch for the gold Win button.`};
+  }
+  if (kong){
+    const ok = hint.tile===kong && /Kong/.test(hint.text);
+    return {...snap, kind:'turn', chosen:kong, rec:hint.tile, grade: ok?'best':'good',
+      title:`You declared a kong of ${mini(kong)}`,
+      note: ok ? 'Kong gives you a free replacement draw and locks in the set.' : `The coach would have skipped the kong here. ${hint.text}`};
+  }
+  if (hint.defensive && hint.D){
+    const D = hint.D, dm = D.danger[chosen], dr = D.danger[hint.tile];
+    const grade = chosen===hint.tile || dm <= dr + .03 ? 'best' : dm <= dr + .15 ? 'good' : dm < .48 ? 'inacc' : 'mistake';
+    return {...snap, kind:'turn', chosen, rec:hint.tile, grade, title:`You discarded ${mini(chosen)} ${tileName(chosen)} 🛡️ defence moment`,
+      note: grade==='best' ? `Good defence: that tile was ${DANGER_TXT[dangerLevel(dm)].toLowerCase()} (${dangerWhy(chosen, D)}).`
+        : `Someone looked close to winning while you were far from ready, so safety mattered more than speed. Your tile was <b>${DANGER_TXT[dangerLevel(dm)].toLowerCase()}</b> (${dangerWhy(chosen, D)}). Coach's pick: ${mini(hint.tile)}, ${DANGER_TXT[dangerLevel(dr)].toLowerCase()} (${dangerWhy(hint.tile, D)}).<br><span class="why">${hint.text}</span>`};
+  }
+  const A = G.coach || analyze(p), c = counts(p.hand);
+  const vals = {};
+  for (let t=0;t<34;t++){ if (!c[t]) continue; c[t]--; vals[t] = value13(p, c, A); c[t]++; }
+  const rec = hint.tile ?? chosen;
+  let bestT = rec; for (const t in vals) if (vals[t].v > vals[bestT].v) bestT = +t;
+  const top = Math.max(vals[rec]?.v||0, vals[bestT].v), mine = vals[chosen];
+  let grade;
+  if (chosen===rec) grade='best';
+  else if (top < 1e-4){
+    const ds = mine.s - Math.min(vals[rec].s, vals[bestT].s);
+    grade = ds<=0 ? 'good' : ds===1 ? 'inacc' : 'mistake';
+  } else {
+    const r = mine.v / top;
+    grade = r>=.95 ? 'best' : r>=.75 ? 'good' : r>=.45 ? 'inacc' : 'mistake';
+  }
+  let note;
+  if (chosen===rec) note = `Same as the coach. Afterwards: ${describeX(mine)}.`;
+  else if (grade==='best') note = `The coach picked ${mini(rec)}, but yours is just as strong. Afterwards: ${describeX(mine)}.`;
+  else note = `Coach's pick: discard ${mini(rec)} <b>${tileName(rec)}</b>.<br>After yours: ${describeX(mine)}.<br>After the coach's: ${describeX(vals[rec])}.<br><span class="why">${hint.text}</span>`;
+  return {...snap, kind:'turn', chosen, rec, grade, title:`You discarded ${mini(chosen)} ${tileName(chosen)}`, note};
+}
+function gradeClaim(p, a){
+  const {o, t, from} = G.claim;
+  const rec = claimDecision(p, t, o);
+  const names = {win:'Win 食糊', pung:'Pung 碰', kong:'Kong 槓', chow:'Chow 上', pass:'Pass'};
+  const mineName = a.type==='chow' ? `Chow ${mini(a.start)}${mini(a.start+1)}${mini(a.start+2)}` : names[a.type];
+  let grade, note;
+  if (rec.type===a.type && (a.type!=='chow' || rec.start===a.start)) { grade='best'; note = rec.reason; }
+  else if (rec.type==='win'){ grade='blunder'; note = rec.reason; }
+  else if ((rec.type==='pung'&&a.type==='kong')||(rec.type==='kong'&&a.type==='pung')||(rec.type==='chow'&&a.type==='chow')){ grade='good'; note=`Close — the coach preferred ${names[rec.type]}. ${rec.reason}`; }
+  else if (a.type==='pass'){ grade='inacc'; note=`The coach would have claimed: ${rec.reason}`; }
+  else { grade = rec.type==='pass' ? 'inacc' : 'good'; note = `The coach would have chosen <b>${names[rec.type]}</b>. ${rec.reason}`; }
+  return {kind:'claim', hand:sortT(p.hand), offered:t, grade, rec:null, chosen:null,
+    title:`${G.players[from].name} discarded ${mini(t)} — you chose <b>${mineName}</b>`, note};
+}
+function recordMove(a){
+  const p = G.players[0]; if (!p || !G.review || a===CANCEL) return;
+  let r = null;
+  if (G.phase==='turn'){
+    if (a.type==='discard') r = gradeDiscard(p, G.turnCtx, a.t);
+    else if (a.type==='kong') r = gradeDiscard(p, G.turnCtx, null, a.k.t);
+    else if (a.type==='win') r = {kind:'turn', hand:sortT(p.hand), grade:'best', title:`You declared <b>Win 食糊</b>`, note:`Well spotted — ${G.turnCtx.win.fan} fan.`};
+  } else if (G.phase==='claim') r = gradeClaim(p, a);
+  if (!r) return;
+  r.n = G.review.length+1; r.hintUsed = !!G.hintUsed; r.wall = G.wall.length;
+  G.review.push(r);
+}
+function openReview(fromEnd){
+  const rv = G.review || [];
+  const cnt = {}; Object.keys(GRADES).forEach(k=>cnt[k]=0); rv.forEach(r=>cnt[r.grade]++);
+  const score = rv.length ? Math.round(100*rv.reduce((a,r)=>a+({best:1,good:.75,inacc:.4,mistake:0,blunder:0}[r.grade]),0)/rv.length) : 0;
+  let verdict;
+  if (!rv.length) verdict = 'No moves recorded yet this hand.';
+  else if (cnt.blunder) verdict = 'You missed a winning hand — always check for the gold Win button before discarding.';
+  else if (score>=90) verdict = 'Excellent hand — you played almost exactly like the coach.';
+  else if (score>=75) verdict = 'Solid play. A few discards were good but not quite the best — see the 👍 and ⚠️ moves.';
+  else if (score>=55) verdict = 'Decent, but several discards slowed your hand down. Focus on picking one target hand early and discarding tiles that don\'t fit it.';
+  else verdict = 'Lots to learn here! Try using the Hint button more and compare its choice with yours.';
+  const onlyBad = G.reviewOnlyBad;
+  const list = rv.filter(r=> !onlyBad || (r.grade!=='best'));
+  const tilesRow = r => {
+    let usedC=false, usedR=false;
+    return r.hand.map(t=>{
+      let cls='sm';
+      if (r.chosen===t && !usedC){ cls+=' rv-mine'; usedC=true; }
+      else if (r.rec===t && r.rec!==r.chosen && !usedR){ cls+=' rv-rec'; usedR=true; }
+      return tileHTML(t, cls);
+    }).join('') + (r.offered!=null ? `<span class="rv-plus">+</span>${tileHTML(r.offered,'sm rv-offer')}` : '');
+  };
+  $('#reviewBody').innerHTML = `
+    <h2>教練 Review — Hand ${G.handNo}</h2>
+    <p class="lead">${verdict}</p>
+    <div class="rv-sum"><div class="rv-score">${rv.length?score:'–'}<small>/100</small></div>
+      <div class="rv-chips">${Object.entries(GRADES).map(([k,g])=>`<span class="rv-chip ${g.cls}">${g.icon} ${g.label.split(' —')[0]} <b>${cnt[k]}</b></span>`).join('')}</div></div>
+    <label class="chk"><input type="checkbox" id="rvOnlyBad" ${onlyBad?'checked':''}> Only show moves I could improve</label>
+    <div class="rv-legend"><span>${tileHTML(0,'xs rv-mine')} your choice</span><span>${tileHTML(0,'xs rv-rec')} coach's choice</span></div>
+    ${list.length ? list.map(r=>`
+      <div class="rv-move ${GRADES[r.grade].cls}">
+        <div class="rv-head"><span class="rv-n">Move ${r.n}</span><span class="rv-grade">${GRADES[r.grade].icon} ${GRADES[r.grade].label}</span>${r.hintUsed?'<span class="rv-hint">used hint</span>':''}</div>
+        <div class="rv-title">${r.title}</div>
+        <div class="rv-tiles">${tilesRow(r)}</div>
+        <div class="rv-note">${r.note}</div>
+      </div>`).join('') : `<p class="muted">${onlyBad?'Nothing to improve — every move matched the coach!':'Play some moves first.'}</p>`}
+    <div class="mbtns"><button class="mbtn sec2" onclick="$('#reviewModal').classList.remove('show')">Close</button>${fromEnd||G.phase==='over'?'<button class="mbtn" onclick="$(\'#reviewModal\').classList.remove(\'show\');startHand()">Next hand ▶</button>':''}</div>`;
+  $('#reviewModal').classList.add('show');
+  $('#reviewModal').dataset.fromEnd = fromEnd ? '1' : '';
+}
+
+function act(a){
+  if (!G.waiting) return;
+  try { recordMove(a); } catch(e){ console.error('review', e); }
+  G.hintUsed = false;
+  const w = G.waiting; G.waiting=null;
+  const wasTurn = G.phase==='turn';
+  G.phase='wait'; G.hint=null; G.claim=null;
+  w(a);
+  if (wasTurn && a.type==='discard'){ setTimeout(()=>{ computeCoach(); render(); }, 0); }
+}
+function computeCoach(){
+  const p = G.players[0]; if (!p) return;
+  G.coach = analyze(p);
+}
+/* ================= Reading the table (public information only) =================
+   Uses only what a real player could see: each opponent's discards (in order), their
+   exposed sets, flowers and how far the wall has gone. Never looks at hidden hands. */
+const SUIT_EN = ['Characters','Dots','Bamboo','honours'];
+function readOpponent(q){
+  const disc = q.discards || [], notes = [];
+  const numMelds = q.melds.filter(m=>m.t<27), honMelds = q.melds.filter(m=>m.t>=27);
+  const meldSuits = new Set(numMelds.map(m=>suitOf(m.t)));
+  const ds = [0,0,0,0]; disc.forEach(d=>ds[suitOf(d.t)]++);
+  const numDisc = ds[0]+ds[1]+ds[2];
+  const progress = G.wallStart ? Math.max(0, 1 - G.wall.length/G.wallStart) : 0;
+  // Which suit are they keeping? Exposed sets in one suit + rarely discarding it = flush tell.
+  let focus = null, focusScore = 0;
+  if (meldSuits.size <= 1){
+    for (let s=0;s<3;s++){
+      if (meldSuits.size===1 && !meldSuits.has(s)) continue;
+      let sc = meldSuits.has(s) ? .3 + .15*numMelds.length : 0;
+      if (numDisc >= 5){ const share = ds[s]/numDisc; sc += share<=.08 ? .45 : share<=.18 ? .2 : -.3; }
+      if (sc > focusScore){ focusScore = sc; focus = s; }
+    }
+  }
+  const flush = focus!==null && focusScore >= .45;
+  const keepsHonours = flush && (honMelds.length>0 || (disc.length>=6 && ds[3] <= 1));
+  const pungy = q.melds.length>=2 && q.melds.every(m=>m.kind!=='chow');
+  const threat = Math.min(.95, .06 + progress*.5 + q.melds.length*.17 + (flush?.08:0) + (q.melds.length>=3?.1:0));
+  const level = threat>=.6 ? 'high' : threat>=.35 ? 'med' : 'low';
+  // Teaching notes — the "why" behind each read
+  const left = 4 - q.melds.length;
+  if (q.melds.length >= 3) notes.push(`Has <b>${q.melds.length} exposed sets</b>: only ${left} set${left>1?'s':''} + a pair left to make. They could already be one tile from winning.`);
+  else if (q.melds.length) notes.push(`${q.melds.length} exposed set${q.melds.length>1?'s':''} (${q.melds.map(m=>m.tiles.slice(0,3).map(mini).join('')).join(' ')}). Each claim shows you part of their plan.`);
+  else if (progress > .5) notes.push(`No exposed sets and the wall is past halfway. A <b>concealed hand can be ready without any warning</b>, so be careful with live tiles.`);
+  else notes.push(`No claims yet, so there's little to read. Watch which suits they throw away.`);
+  if (flush){
+    const sn = SUIT_EN[focus];
+    notes.push(`Has thrown only <b>${ds[focus]} ${sn}</b> out of ${numDisc} number-tile discards${meldSuits.has(focus)?` and claimed ${sn} sets`:''}: probably collecting <b>${sn}${keepsHonours?' + honours (Half Flush 混一色?)':' (Flush?)'}</b>. ${sn} tiles are risky to give them.`);
+  } else if (numDisc >= 6){
+    const most = [0,1,2].sort((a,b)=>ds[b]-ds[a])[0];
+    notes.push(`Discarding all suits evenly. Most thrown: ${SUIT_EN[most]} (${ds[most]}), so they probably don't need ${SUIT_EN[most]}.`);
+  }
+  if (pungy) notes.push(`All their sets are <b>pungs</b>: maybe going for All Pungs 對對糊. Any tile with 2+ copies still unseen could complete a pung for them.`);
+  honMelds.forEach(m=>{ if (m.t>=31 || m.t===27+seatOf(q) || m.t===27+G.prevWind) notes.push(`Punged ${mini(m.t)}, which already gives them fan, so they can afford to keep claiming.`); });
+  const early = disc.slice(0,3).filter(d=>d.t<27);
+  if (early.length >= 2) notes.push(`Early discards ${early.map(d=>mini(d.t)).join('')}: players throw useless tiles first, so tiles right next to these are a bit less likely to help them.`);
+  return {q, flush, focus, keepsHonours, pungy, threat, level, notes, ds, numDisc, early:early.map(d=>d.t)};
+}
+function tileDanger(t, R, unseen){
+  const u = unseen[t];
+  let base;
+  if (t >= 27) base = u===0 ? 0 : u===1 ? .2 : u===2 ? .55 : .7;          // honours: need copies left to pung or pair
+  else { const n = t%9; base = (n===0||n===8) ? .4 : (n===1||n===7) ? .6 : .8; if (u===0) base *= .6; }
+  let fit = 1;
+  if (R.flush) fit = t<27 ? (suitOf(t)===R.focus ? 2.3 : .25) : (R.keepsHonours ? 1.4 : .5);
+  if (R.pungy) fit *= u>=2 ? 1.3 : .4;
+  if (R.q.discards.some(d=>d.t===t)) fit *= .3;                          // they threw it themselves earlier
+  if (t<27 && R.early.some(e=>suitOf(e)===suitOf(t) && Math.abs(e-t)<=2)) fit *= .8;
+  return Math.min(1, R.threat * base * fit);
+}
+function dangerMap(me){
+  const unseen = unseenFor(me), reads = G.players.filter(q=>q!==me).map(readOpponent);
+  const danger = new Array(34).fill(0), worst = new Array(34).fill(null);
+  for (let t=0;t<34;t++){
+    let safe = 1, wd = 0;
+    for (const R of reads){ const d = tileDanger(t, R, unseen); safe *= 1-d; if (d>wd){ wd=d; worst[t]=R; } }
+    danger[t] = 1-safe;
+  }
+  return {reads, danger, worst, unseen};
+}
+const dangerLevel = d => d<.12 ? 'safe' : d<.28 ? 'low' : d<.48 ? 'med' : 'high';
+const DANGER_TXT = {safe:'Safe', low:'Low risk', med:'Some risk', high:'Dangerous'};
+function dangerWhy(t, D){
+  const R = D.worst[t]; if (!R || D.danger[t] < .12){
+    if (t>=27 && D.unseen[t]<=1) return `${D.unseen[t]===0?'all other copies are visible':'only 1 copy is unseen'}, so nobody can pung it`;
+    return 'nobody looks close to needing it';
+  }
+  if (R.flush && t<27 && suitOf(t)===R.focus) return `${R.q.name} seems to be collecting ${SUIT_EN[R.focus]}`;
+  if (R.q.discards.some(d=>d.t===t)) return `${R.q.name} threw this tile themselves earlier`;
+  if (t>=27 && D.unseen[t]>=2) return `${D.unseen[t]} copies unseen: someone could pung it`;
+  return `${R.q.name} looks ${R.level==='high'?'close to winning':'to be building up'}`;
+}
+// Turn the speed-first plan into a balanced one: prefer safer tiles, and fold when far behind.
+// Fold thresholds, tuned by self-play (paired deals, 1,500 hands per setting): folding at threat .60 fired in
+// ~23% of hands for no measurable gain; .75 keeps the lesson for clearly-close opponents and fires about half as often.
+const DEF = {fold:true, minS:2, minThreat:.75, minWallLeft:999};
+const CAUTIOUS_DEF = {fold:true, minS:2, minThreat:.6, minWallLeft:999};   // the 守 Cautious AI folds early on purpose
+function defensiveAdjust(p, plan, cfg){
+  cfg = cfg || DEF;
+  const D = dangerMap(p), top = D.reads.slice().sort((a,b)=>b.threat-a.threat)[0];
+  const myS = plan.ready ? 0 : (plan.target ? Math.max(0, plan.target.s) : 6);
+  const c = counts(p.hand), mine = [...new Set(p.hand)];
+  if (cfg.fold && top && top.threat >= cfg.minThreat && myS >= cfg.minS && G.wall.length <= cfg.minWallLeft){
+    const safest = mine.slice().sort((a,b)=>D.danger[a]-D.danger[b])[0];
+    if (D.danger[safest] < D.danger[plan.discard] - .05){
+      return {...plan, discard:safest, defensive:true, D,
+        reason:`<b>Play safe 🛡️</b> ${top.q.name} looks close to winning (${top.q.melds.length} exposed sets${top.flush?`, collecting ${SUIT_EN[top.focus]}`:''}). You're still ${myS} tiles from ready, so you're unlikely to win this race. Discard ${mini(safest)} <b>${tileName(safest)}</b> (${DANGER_TXT[dangerLevel(D.danger[safest])].toLowerCase()}: ${dangerWhy(safest, D)}) instead of feeding them ${mini(plan.discard)}.`};
+    }
+  }
+  if (plan.target && plan.target.discards.length > 1){
+    const safer = plan.target.discards.filter(t=>c[t]).sort((a,b)=>D.danger[a]-D.danger[b])[0];
+    if (safer!==undefined && safer!==plan.discard && D.danger[safer] < D.danger[plan.discard] - .04)
+      return {...plan, discard:safer, D, reason: plan.reason.replace(/Discard .*?<\/b>\./, `Discard ${mini(safer)} <b>${tileName(safer)}</b>.`) +
+        ` <span class="muted">(${mini(safer)} and ${mini(plan.discard)} are equally good for your hand, but ${mini(safer)} is safer: ${dangerWhy(safer, D)}.)</span>`};
+  }
+  const lv = dangerLevel(D.danger[plan.discard]);
+  if (lv==='high' || lv==='med') plan = {...plan, reason: plan.reason + ` <span class="muted">⚠️ Heads-up: this tile is risky (${dangerWhy(plan.discard, D)}), but it's your best move for speed.</span>`};
+  return {...plan, D};
+}
+/* ================= Hands gallery (all scoring hands + how close you are) ================= */
+const GALLERY = [
+  {cn:'雞糊', en:'Basic hand (chicken hand)', fan:'0', kind:'shape', tg:'std', ex:[0,1,2,13,14,15,22,22,22,6,7,8,31,31],
+   d:'Any 4 sets + a pair, no pattern. Worth 0 fan by itself — you need 3 fan from bonuses (dragon/wind pungs, flowers, concealed, self-drawn).'},
+  {cn:'平糊', en:'All Chows', fan:'1', kind:'shape', tg:'chows', ex:[0,1,2,3,4,5,10,11,12,20,21,22,16,16],
+   d:'All four sets are runs (chows). Suits can be mixed; the pair can be anything.'},
+  {cn:'對對糊', en:'All Pungs', fan:'3', kind:'shape', tg:'pungs', ex:[1,1,1,13,13,13,24,24,24,31,31,31,8,8],
+   d:'All four sets are pungs (or kongs). Claiming pungs is fine.'},
+  {cn:'混一色', en:'Half Flush', fan:'3', kind:'shape', tg:'hf', ex:[9,10,11,13,14,15,16,16,16,27,27,27,33,33],
+   d:'One suit plus honour tiles (winds/dragons) only.'},
+  {cn:'七對子', en:'Seven Pairs', fan:'4', kind:'shape', tg:'pairs', ex:[0,0,5,5,10,10,14,14,20,20,28,28,32,32],
+   d:'Seven different pairs. Must stay concealed — no claiming except the winning tile.'},
+  {cn:'小三元', en:'Small Three Dragons', fan:'5', kind:'sets', ex:[31,31,31,32,32,32,33,33,1,2,3,14,15,16],
+   d:'Pungs of two dragons plus a pair of the third.'},
+  {cn:'小四喜', en:'Small Four Winds', fan:'6', kind:'sets', ex:[27,27,27,28,28,28,29,29,29,30,30,4,5,6],
+   d:'Pungs of three winds plus a pair of the fourth.'},
+  {cn:'清一色', en:'Full Flush', fan:'7', kind:'shape', tg:'ff', ex:[18,19,20,21,22,23,23,24,25,26,26,26,22,22],
+   d:'Every tile from one suit. No honours.'},
+  {cn:'大三元', en:'Great Three Dragons', fan:'8', kind:'sets', ex:[31,31,31,32,32,32,33,33,33,1,2,3,9,9],
+   d:'Pungs of all three dragons 中 發 白.'},
+  {cn:'字一色', en:'All Honours', fan:'10', kind:'count', ex:[27,27,27,28,28,28,31,31,31,32,32,32,33,33],
+   d:'Only winds and dragons.'},
+  {cn:'清么九', en:'All Terminals', fan:'10', kind:'count', ex:[0,0,0,8,8,8,9,9,9,17,17,17,26,26],
+   d:'Only 1s and 9s, all pungs.'},
+  {cn:'十三么', en:'Thirteen Orphans', fan:'Limit', kind:'shape', tg:'orphans', ex:[0,8,9,17,18,26,27,28,29,30,31,32,33,0],
+   d:'One of every 1, 9, wind and dragon, plus one duplicate. Concealed only.'},
+  {cn:'坎坎糊', en:'Four Concealed Pungs', fan:'Limit', kind:'count', ex:[2,2,2,11,11,11,19,19,19,30,30,30,5,5],
+   d:'Four pungs you drew yourself (none claimed).'},
+  {cn:'大四喜', en:'Great Four Winds', fan:'Limit', kind:'sets', ex:[27,27,27,28,28,28,29,29,29,30,30,30,9,9],
+   d:'Pungs of all four winds.'},
+  {cn:'九子連環', en:'Nine Gates', fan:'Limit', kind:'count', ex:[9,9,9,10,11,12,13,14,15,16,17,17,17,13],
+   d:'1-1-1-2-3-4-5-6-7-8-9-9-9 of one suit, plus any tile of that suit. Concealed.'},
+  {cn:'番子', en:'Dragon pung (add-on)', fan:'+1', kind:'sets', ex:[31,31,31], addon:true,
+   d:'Any pung of 中 發 or 白, on top of whatever else your hand is.'},
+  {cn:'門風 / 圈風', en:'Seat / round wind pung (add-on)', fan:'+1', kind:'sets', ex:[27,27,27], addon:true,
+   d:'A pung of your own seat wind, or of the round wind. Both if they match: +2.'},
+];
+const BONUS_FAN = [
+  ['自摸','Self-drawn win','+1'],['門前清','Concealed hand (never claimed)','+1'],['無花','No flowers','+1'],
+  ['正花','Own flower / own season (each)','+1'],['一台花','All four flowers or all four seasons','+2'],
+  ['海底撈月','Win on the last tile','+1'],['河底撈魚','Win on the last discard','+1'],['槓上開花','Win on a kong replacement tile','+1'],
+  ['搶槓','Robbing a kong (win on the tile someone adds to their pung)','+1'],['槓上槓','Win after two kongs in a row','+8'],
+  ['天糊 / 地糊','Heavenly / earthly hand (win on the deal / on the dealer’s first discard)','Limit'],
+  ['八仙過海','Collect all eight flowers & seasons — instant win','Limit']];
+function galleryDistances(p){
+  const A = G.coach || analyze(p), c = A.c, unseen = A.unseen, melds = p.melds, out = {};
+  const best = kind => { let m=INF; for (const x of A.all){ const k = x.tg.key; if ((kind==='hf'&&k.startsWith('hf'))||(kind==='ff'&&k.startsWith('ff'))||x.tg.kind===kind) m=Math.min(m,x.s); } return m; };
+  const have = t => c[t] + (melds.some(m=>m.t===t && m.kind!=='chow') ? 3 : 0);
+  const needP = t => { const h = have(t); if (h>=3) return 0; return h+unseen[t] >= 3 ? 3-h : INF; };
+  const needPair = t => { const h = have(t); if (h>=2) return 0; return h+unseen[t] >= 2 ? 2-h : INF; };
+  const sum = a => a.reduce((x,y)=>x+y,0);
+  const dr=[31,32,33], wi=[27,28,29,30];
+  const numTiles = p.hand.filter(t=>t<27).length, numMeld = melds.some(m=>m.t<27);
+  const termOK = t => isTerm(t);
+  for (const g of GALLERY){
+    let v = INF, unit = 'need';
+    if (g.kind==='shape'){ v = best(g.tg); unit='away'; }
+    else if (g.en.startsWith('Small Three')) v = Math.min(...dr.map(pr=>needPair(pr)+sum(dr.filter(x=>x!==pr).map(needP))));
+    else if (g.en.startsWith('Great Three')) v = sum(dr.map(needP));
+    else if (g.en.startsWith('Small Four')) v = Math.min(...wi.map(pr=>needPair(pr)+sum(wi.filter(x=>x!==pr).map(needP))));
+    else if (g.en.startsWith('Great Four')) v = sum(wi.map(needP));
+    else if (g.en.startsWith('All Honours')) v = numMeld ? INF : numTiles;
+    else if (g.en.startsWith('All Terminals')) v = melds.some(m=>m.kind==='chow'||!termOK(m.t)) ? INF : p.hand.filter(t=>!termOK(t)).length;
+    else if (g.en.startsWith('Four Concealed')) { v = melds.some(m=>!m.concealed) ? INF : shPungs(c, melds); unit='away'; }
+    else if (g.en.startsWith('Nine Gates')){
+      if (melds.length) v = INF; else { const base=[3,1,1,1,1,1,1,1,3]; v = Math.min(...[0,1,2].map(s=>sum(base.map((b,i)=>Math.max(0,b-c[s*9+i]))))); }
+    }
+    else if (g.en.startsWith('Dragon pung')) v = Math.min(...dr.map(needP));
+    else if (g.en.startsWith('Seat')) v = Math.min(needP(27+seatOf(p)), needP(27+G.prevWind));
+    if (v > 13) v = INF;
+    out[g.en] = {v, unit};
+  }
+  return out;
+}
+function distLabel(r){
+  if (r.v>=INF) return {txt:'Not possible now', cls:'gd-no'};
+  if (r.unit==='away') return r.v<0 ? {txt:'Complete!', cls:'gd-ok'} : r.v===0 ? {txt:'Ready! 1 tile to win', cls:'gd-ok'} : {txt:`${r.v} tile${r.v>1?'s':''} from ready`, cls: r.v<=2?'gd-near':'gd-far'};
+  return r.v===0 ? {txt:'You have it ✓', cls:'gd-ok'} : {txt:`Need ${r.v} more tile${r.v>1?'s':''}`, cls: r.v<=2?'gd-near':'gd-far'};
+}
+function openHands(){
+  const p = G.players[0], playing = p && p.hand.length && G.phase!=='over' && G.phase!=='idle';
+  const dist = playing ? galleryDistances(p) : null;
+  const lim = G.handsLimit ?? 9;
+  const items = GALLERY.map(g=>({g, r: dist ? dist[g.en] : null}))
+    .sort((a,b)=> dist ? ((a.r.v>=INF)-(b.r.v>=INF) || a.r.v-b.r.v) : 0);
+  $('#handsBody').innerHTML = `
+    <h2>牌型 All hands</h2>
+    <p class="lead">Every way to score in this game. You need <b>3 fan</b> to win: one big hand, or a smaller hand plus add-ons and bonuses.</p>
+    ${playing ? `<div class="hslider"><label for="handsLimit">Show hands within</label>
+      <input type="range" id="handsLimit" min="0" max="9" step="1" value="${lim}">
+      <b id="handsLimitVal">${lim>=9?'All hands':`${lim} tile${lim===1?'':'s'} of my hand`}</b></div>
+      <div class="muted" style="font-size:14px;margin:-4px 0 10px">Slide left to see only the hands your current tiles are closest to. "Tiles from ready" counts swaps until you're one tile from winning; "need" counts tiles still missing for that set.</div>`
+      : `<div class="muted" style="font-size:14px;margin-bottom:10px">Start a hand to see how close your tiles are to each one.</div>`}
+    <div class="hgrid">${items.length ? items.map(({g,r})=>{ const L = r ? distLabel(r) : null; return `
+      <div class="hcard ${L&&L.cls==='gd-no'?'hc-no':''}" data-v="${r ? Math.min(r.v,99) : 0}">
+        <div class="hc-top"><span class="cn">${g.cn}</span><span class="hc-en">${g.en}</span><span class="hc-fan">${g.fan}${/^\d/.test(g.fan)||g.fan.startsWith('+')?' fan':''}</span></div>
+        ${L?`<div class="gdist ${L.cls}">${L.txt}</div>`:''}
+        <div class="hc-ex">${g.ex.map(t=>tileHTML(t,'xs')).join('')}</div>
+        <div class="hc-d">${g.d}</div></div>`; }).join('') : '<p class="muted">No hands that close yet — slide right to see more.</p>'}</div>
+    <p id="handsEmpty" class="muted" style="display:none">No hands that close yet. Slide right to see more.</p>
+    <h3 style="margin:16px 0 6px">Bonus fan (add to any hand)</h3>
+    <table class="rules">${BONUS_FAN.map(b=>`<tr><td class="cn">${b[0]}</td><td>${b[1]}</td><td class="f">${b[2]}</td></tr>`).join('')}</table>
+    <div class="mbtns"><button class="mbtn" onclick="$('#handsModal').classList.remove('show')">Close</button></div>`;
+  $('#handsModal').classList.add('show');
+  applyHandsFilter();
+}
+function applyHandsFilter(){
+  const lim = G.handsLimit ?? 9; let shown = 0;
+  document.querySelectorAll('#handsBody .hcard').forEach(el=>{ const ok = lim>=9 || +el.dataset.v <= lim; el.style.display = ok ? '' : 'none'; if (ok) shown++; });
+  const v = $('#handsLimitVal'); if (v) v.textContent = lim>=9 ? 'All hands' : `${lim} tile${lim===1?'':'s'} of my hand (${shown})`;
+  const e = $('#handsEmpty'); if (e) e.style.display = shown ? 'none' : '';
+}
+function tableReadHTML(p){
+  const D = G.dangerD || dangerMap(p);
+  const thrTxt = {low:'Early / not close', med:'Building up', high:'Close to winning'};
+  let h = `<div class="sec"><h3>Read the table 讀牌</h3>
+    <div class="muted" style="font-size:14px;line-height:1.45;margin-bottom:8px">Based only on what you could see at a real table: discards (in order), exposed sets and flowers. The coach never peeks at hidden tiles.</div>`;
+  D.reads.slice().sort((a,b)=>b.threat-a.threat).forEach(R=>{
+    const q = R.q;
+    h += `<div class="opp">
+      <div class="opp-h"><b>${q.name}</b> <span class="swind">${HONORS[seatOf(q)].cn}</span>${q.style?`<span class="muted" style="font-size:13px">${AI_STYLES[q.style].cn} ${AI_STYLES[q.style].en}</span>`:''}<span class="thr thr-${R.level}">${thrTxt[R.level]}</span></div>
+      <div class="bar"><i style="width:${Math.round(R.threat*100)}%"></i></div>
+      ${q.style?`<div class="muted" style="font-size:13px;margin:2px 0 4px">${AI_STYLES[q.style].d}</div>`:''}
+      <div class="opp-disc"><span class="muted">Discards:</span> ${(q.discards||[]).map(d=>mini(d.t)).join('') || '<span class="muted">none yet</span>'}</div>
+      <ul>${R.notes.map(n=>`<li>${n}</li>`).join('')}</ul></div>`;
+  });
+  // Tile supply
+  const sup=[0,0,0,0]; D.unseen.forEach((u,t)=>sup[suitOf(t)]+=u);
+  const per = [36,36,36,28];
+  h += `<div class="supply"><b>Tiles you haven't seen yet:</b> ${[0,1,2,3].map(s=>`${['萬','筒','索','字'][s]} ${SUIT_EN[s]} <b>${sup[s]}</b>/${per[s]-0}`).join(' · ')}
+    <div class="muted">A suit with few unseen tiles is drying up: it's harder to complete runs or a flush in it.</div></div>`;
+  // Your tiles by danger
+  const mine = [...new Set(p.hand)].sort((a,b)=>D.danger[a]-D.danger[b]);
+  const groups = {safe:[], low:[], med:[], high:[]};
+  mine.forEach(t=>groups[dangerLevel(D.danger[t])].push(t));
+  h += `<div class="dgroups"><b>Your tiles, safest to most dangerous to discard:</b>`;
+  ['safe','low','med','high'].forEach(k=>{ if (groups[k].length) h += `<div class="dg"><span class="dlab d-${k}">${DANGER_TXT[k]}</span>${groups[k].map(t=>`<span title="${dangerWhy(t,D).replace(/<[^>]+>/g,'')}">${mini(t)}</span>`).join('')}</div>`; });
+  h += `<label class="chk"><input type="checkbox" id="optDangerDots" ${S.dangerDots!==false?'checked':''}> Show danger dots on my tiles</label>
+    <div class="muted" style="font-size:14px;line-height:1.45">Rule of thumb: play for speed most of the time — in testing, folding too often cost as many wins as it saved. Switch to safe discards only when someone is <i>clearly</i> close (usually 3 exposed sets, or a flush that's obviously coming) and you're 2+ tiles from ready. Tiles they've thrown themselves, and honours with most copies already visible, are usually safest.</div></div></div>`;
+  return h;
+}
+function getHint(){
+  const p = G.players[0];
+  if (G.phase==='turn'){
+    const ctx = G.turnCtx;
+    if (ctx.win && ctx.win.ok) return {text:`Declare <b>Win 食糊!</b> Your hand scores <b>${ctx.win.fan} fan</b>.`};
+    const plan = defensiveAdjust(p, planTurn(p, G.coach));
+    for (const k of ctx.kongs) if (!plan.defensive && kongAdvisable(p, k, plan)) return {text:`Declare <b>Kong 槓</b> of ${mini(k.t)} — you get a free replacement draw and the set is locked in. Then: ${plan.reason}`, tile:k.t};
+    let extra = '';
+    if (ctx.win && !ctx.win.ok) extra = `<br><span class="muted">Your hand is complete, but only worth ${ctx.win.fan} fan — the minimum is 3, so keep building.</span>`;
+    return {text: plan.reason + extra, tile: plan.discard, defensive: !!plan.defensive, D: plan.D};
+  }
+  if (G.phase==='claim'){
+    const d = claimDecision(p, G.claim.t, G.claim.o);
+    return {text: d.reason, claim:d};
+  }
+  return {text:`Wait for your turn — meanwhile, watch what others discard. Tiles already in the middle can't come to you.`};
+}
+function showHint(){
+  if (!G.players.length) return;
+  G.hint = getHint(); if (G.phase==='turn'||G.phase==='claim') G.hintUsed = true;
+  if (!document.body.classList.contains('coach-open')) document.body.classList.add('coach-open');
+  render();
+}
+
+/* ================= Rendering ================= */
+function sortT(a){ return a.slice().sort((x,y)=>x-y); }
+function meldHTML(m, size){
+  return `<div class="meld">${m.tiles.map((t,i)=> (m.kind==='kong' && m.concealed && (i===0||i===3)) ? backHTML(size) : tileHTML(t,size)).join('')}</div>`;
+}
+function styleBadge(p){ const s = p.style && AI_STYLES[p.style]; return s ? `<span class="sty" data-tipx="${s.en}: ${s.d}">${s.cn}</span>` : ''; }
+function plateHTML(p){
+  const seat = seatOf(p), active = G.cur===p.idx && G.phase!=='over';
+  return `<div class="plate ${active?'active':''}"><span class="swind" data-tipx="Seat wind: ${HONORS[seat].en} (${HONORS[seat].py})">${HONORS[seat].cn}</span>${p.name}${styleBadge(p)}${p.idx===G.dealer?'<span class="dealer" data-tipx="莊 zhuāng — dealer">莊</span>':''}<span class="pscore">${p.score}</span></div>`;
+}
+// Phone layout: all opponents in one compact strip across the top
+function renderAIStrip(){
+  const el = $('#seat-top'); el.classList.remove('empty');
+  el.innerHTML = '<div class="ai-strip">' + G.players.filter(p=>!p.human).map(p=>
+    `<div class="ai-card">${plateHTML(p)}<div class="ai-count">${G.reveal ? sortT(p.hand).map(t=>tileHTML(t,'xs')).join('') : `🀫 × ${p.hand.length}`}</div>
+      ${p.melds.length||p.flowers.length ? `<div class="meldrow">${p.melds.map(m=>meldHTML(m,'xs')).join('')}${p.flowers.map(f=>tileHTML(f,'xs')).join('')}</div>` : ''}</div>`).join('') + '</div>';
+}
+function renderAISeat(p, pos){
+  const el = $('#seat-'+pos); el.classList.remove('empty');
+  const side = pos==='left'||pos==='right';
+  const hand = G.reveal ? sortT(p.hand).map(t=>tileHTML(t,'sm')).join('') : p.hand.map(()=>backHTML(side?'side':'sm')).join('');
+  el.innerHTML = `${plateHTML(p)}<div class="ai-hand">${hand}</div>
+    <div class="meldrow">${p.melds.map(m=>meldHTML(m,'sm')).join('')}</div>
+    <div class="flowers">${p.flowers.map(f=>tileHTML(f,'sm')).join('')}</div>`;
+}
+/* ---- Free-form tile tray: your hand lives here; drag tiles anywhere, click to discard ---- */
+const ROW_H = 1.12;          // vertical distance between rows, in tile heights
+const TRAY_YMAX = 1.25;      // lowest allowed tile top, in rows
+function trayOverlap(x, y, skip){
+  return G.tray.items.some(i=>i!==skip && Math.abs(i.x-x)<0.9 && Math.abs(i.y-y)<0.8);
+}
+function freeSpot(x, y, skip){
+  const W = G.trayW || 15, maxX = Math.max(0, W-1);
+  const clampX = v => Math.max(0, Math.min(maxX, v));
+  x = clampX(x); y = Math.max(0, Math.min(TRAY_YMAX, y));
+  if (!trayOverlap(x,y,skip)) return {x,y};
+  for (let d=.25; d<=W; d+=.25){
+    for (const nx of [x+d, x-d]) if (nx>=0 && nx<=maxX && !trayOverlap(nx,y,skip)) return {x:nx,y};
+  }
+  const oy = y < .6 ? ROW_H : 0;
+  for (let d=0; d<=W; d+=.25){
+    for (const nx of [x+d, x-d]) if (nx>=0 && nx<=maxX && !trayOverlap(nx,oy,skip)) return {x:nx,y:oy};
+  }
+  return {x,y};
+}
+function placeNewTile(t, gap){
+  const W = G.trayW || 15, items = G.tray.items;
+  for (const y of [0, ROW_H]){
+    const row = items.filter(i=>Math.abs(i.y-y)<.6);
+    const x = row.length ? Math.max(...row.map(i=>i.x)) + 1.04 + gap : 0;
+    if (x <= W-1) return {x, y};
+  }
+  return freeSpot(W-1, 0, null);
+}
+function reconcileTray(p){
+  if (!G.tray) G.tray = {items:[], seq:0};
+  const items = G.tray.items, need = counts(p.hand), have = new Array(34).fill(0);
+  items.forEach(i=>have[i.t]++);
+  for (let t=0;t<34;t++){
+    while (have[t] > need[t]){
+      let idx = items.findIndex(i=>i.id===G.trayRemoveId && i.t===t);
+      if (idx<0){ for (let k=items.length-1;k>=0;k--) if (items[k].t===t){ idx=k; break; } }
+      items.splice(idx,1); have[t]--;
+    }
+  }
+  G.trayRemoveId = null;
+  const initial = items.length===0;
+  for (const t of p.hand){
+    if (have[t] >= need[t]) continue;
+    have[t]++;
+    const pos = placeNewTile(t, initial ? 0 : .3);
+    const it = {id:++G.tray.seq, t, ...pos};
+    items.push(it);
+    if (!initial) G.tray.lastId = it.id;
+  }
+}
+function sortTray(){
+  const W = G.trayW || 15; let x=0, y=0, prevSuit=null;
+  const items = G.tray.items.slice().sort((a,b)=>a.t-b.t);
+  for (const it of items){
+    const s = suitOf(it.t);
+    if (prevSuit!==null && s!==prevSuit) x += .45;
+    if (x > W-1){ x = 0; y = ROW_H; }
+    it.x = x; it.y = y; x += 1.04; prevSuit = s;
+  }
+  render();
+}
+function renderHuman(){
+  const p = G.players[0], el = $('#seat-bottom');
+  // tile size: comes from the interface-size setting, shrunk only if the hand can't fit
+  const meldPx = p.melds.reduce((a,m)=>a+m.tiles.length*47+12,0) + p.flowers.length*34 + (p.melds.length||p.flowers.length ? 24 : 0);
+  const mobile = document.body.classList.contains('mobile');
+  const avail = mobile ? el.clientWidth - 16 : Math.max(300, el.clientWidth - 40 - meldPx);
+  const tw = mobile ? Math.min(58, avail/7.35) : Math.max(34, Math.min(62, avail/15.2)), th = tw*1.35;
+  G.trayW = avail / tw; G.trayTW = tw; G.trayTH = th;
+  reconcileTray(p);
+  // keep everything inside the tray if it got narrower
+  for (const it of G.tray.items) if (it.x > G.trayW-1){ const s = freeSpot(G.trayW-1, it.y, it); it.x=s.x; it.y=s.y; }
+  const c = counts(p.hand);
+  const focusT = G.focus ? TARGETS.find(t=>t.key===G.focus) : null;
+  let hintUsed=false;
+  const chowSet = new Set();
+  if (G.hint?.claim?.type==='chow'){ const st=G.hint.claim.start; [st,st+1,st+2].forEach(x=>chowSet.add(x)); }
+  const tilesH = G.tray.items.slice().sort((a,b)=>a.y-b.y||a.x-b.x).map(it=>{
+    const t = it.t; let cls = '';
+    if (G.phase==='turn' && it.id===G.tray.lastId && G.turnCtx?.drew) cls+=' drawn';
+    if (G.selItem===it.id) cls+=' sel reveal';
+    if (S.dangerDots!==false && G.dangerD && G.phase!=='over') cls += ' dd-' + dangerLevel(G.dangerD.danger[t]);
+    if (focusT && !fitsTarget(focusT, t, c)) cls+=' dim';
+    if (G.hint && G.hint.tile===t && !hintUsed && G.phase==='turn'){ cls+=' hint'; hintUsed=true; }
+    if (chowSet.has(t) && t!==G.claim?.t){ cls+=' chowpart'; chowSet.delete(t); }
+    return tileHTML(t, cls, `data-item="${it.id}" style="left:${(it.x*tw).toFixed(1)}px;top:${(it.y*th*1.0).toFixed(1)}px"`);
+  }).join('');
+  const trayH = (TRAY_YMAX + 1) * th + 10;
+  el.innerHTML = `<div class="bottom-top">${plateHTML(p)}<div id="actions">${actionsHTML()}</div><button class="act pass" data-sort="1" title="Line your tiles up by suit">↕ Sort by suit</button></div>
+    <div class="handrow"><div class="tray" style="width:${avail.toFixed(0)}px;height:${trayH.toFixed(0)}px">${tilesH}</div>
+      ${p.melds.length||p.flowers.length?`<div class="side-sets">${p.melds.length?`<div class="meldrow">${p.melds.map(m=>meldHTML(m,'lg')).join('')}</div>`:''}
+      ${p.flowers.length?`<div class="flowers">${p.flowers.map(f=>tileHTML(f,'sm')).join('')}</div>`:''}</div>`:''}</div>`;
+  el.style.setProperty('--htw', tw.toFixed(1)+'px'); el.style.setProperty('--hth', th.toFixed(1)+'px');
+}
+function actionsHTML(){
+  if (G.phase==='turn'){
+    const ctx = G.turnCtx; let h = `<span class="prompt">Your turn — ${document.body.classList.contains('mobile')?'tap a tile twice':'click a tile'} to discard</span>`;
+    if (ctx.win){
+      h += ctx.win.ok ? `<button class="act win" data-act="win"><span class="cn">食糊</span> Win (${ctx.win.fan} fan)</button>`
+        : `<button class="act" disabled title="Need at least 3 fan">Complete, but only ${ctx.win.fan} fan</button>`;
+    }
+    ctx.kongs.forEach((k,i)=> h += `<button class="act" data-act="kong" data-k="${i}"><span class="cn">槓</span> Kong ${mini(k.t)}</button>`);
+    return h;
+  }
+  if (G.phase==='claim'){
+    const {o,t,from} = G.claim;
+    let h = G.robbing ? `<span class="prompt">${G.players[from].name} is adding ${mini(t)} to a kong — rob it?</span>` : `<span class="prompt">${G.players[from].name} discarded ${mini(t)} — claim it?</span>`;
+    if (o.win && o.win.ok) h += `<button class="act win" data-act="cwin"><span class="cn">食糊</span> Win (${o.win.fan} fan)</button>`;
+    if (o.kong) h += `<button class="act" data-act="ckong"><span class="cn">槓</span> Kong</button>`;
+    if (o.pung) h += `<button class="act" data-act="cpung"><span class="cn">碰</span> Pung</button>`;
+    (o.chows||[]).forEach(st => h += `<button class="act" data-act="cchow" data-st="${st}"><span class="cn">上</span> Chow ${mini(st)}${mini(st+1)}${mini(st+2)}</button>`);
+    h += `<button class="act pass" data-act="pass">Pass</button>`;
+    return h;
+  }
+  if (G.phase==='over') return `<button class="act win" onclick="startHand()">Next hand ▶</button>`;
+  const cp = G.players[G.cur];
+  return `<span class="prompt" style="opacity:.75">${cp && !cp.human ? `${cp.name} is thinking…` : '…'}</span>`;
+}
+function renderPond(){
+  const pond = $('#pond');
+  pond.innerHTML = G.center.map((d,i)=>{
+    const last = G.lastDiscard && G.lastDiscard.id===d.id;
+    const html = `<div class="pond-tile ${last?'last':''} ${d.fresh?'fresh':''}" style="left:${(d.x*100).toFixed(2)}%;top:${(d.y*100).toFixed(2)}%;--r:${d.r}deg;z-index:${last?900:i+1}">${tileHTML(d.t,'lg',`data-from="${d.from}"`)}</div>`;
+    d.fresh = false; return html;
+  }).join('');
+  const pw = HONORS[G.prevWind];
+  $('#centerInfo').innerHTML = `Wall: <b>${G.wall.length}</b> tiles · Round wind <b>${pw.cn}</b> ${pw.en} · Hand ${G.handNo}`;
+}
+function render(){
+  if (!G.players.length) return;
+  ['top','left','right'].forEach(pos=>{ const el=$('#seat-'+pos); el.innerHTML=''; el.classList.add('empty'); });
+  if (document.body.classList.contains('mobile')) renderAIStrip();
+  else G.players.forEach(p=>{ if (!p.human) renderAISeat(p, G.pos[p.idx]); });
+  G.dangerD = G.phase!=="over" && G.players[0].hand.length ? dangerMap(G.players[0]) : null;
+  renderHuman(); renderPond(); renderCoach();
+  document.body.classList.toggle('myturn', G.phase==='turn');
+  const pw = HONORS[G.prevWind];
+  $('#roundInfo').textContent = `Round ${pw.cn} ${pw.en} · min 3 fan`;
+}
+
+function pctTxt(p){ if (p>=.995) return '≈100%'; if (p<.005) return p>0?'<1%':'0%'; return Math.round(p*100)+'%'; }
+function renderCoach(){
+  const el = $('#coachBody'), p = G.players[0];
+  if (!p){ el.innerHTML=''; return; }
+  const A = G.coach;
+  let h = '';
+  // Status
+  let status='', sub='';
+  if (G.phase==='over'){ status='Hand over.'; sub='Start the next hand when you are ready.'; }
+  else if (A){
+    const minS = Math.min(...A.all.map(x=>x.s));
+    if (G.phase==='turn' && G.turnCtx?.win?.ok) { status = '🎉 You can win right now!'; sub = `Your hand is worth ${G.turnCtx.win.fan} fan — press Win.`; }
+    else if (minS<=0) { status = 'Ready! 聽牌 (tīng pái)'; sub = A.has14 ? 'Discard the right tile and you are one tile from winning.' : 'You are one tile from winning.'; }
+    else { status = `${minS} tile${minS>1?'s':''} away from ready`; sub = `向聽 (xiàng tīng) = ${minS}. Ready means one tile from winning.`; }
+    sub += ` About ${A.draws} draws left for you.`;
+  }
+  h += `<div class="sec"><div class="status">${status}<span class="sub">${sub}</span></div></div>`;
+  // Hint
+  h += `<div class="sec"><button class="hintbtn" id="hintBtn">💡 Hint — what should I do? (H)</button>
+    ${G.hint?`<div class="hintbox">${G.hint.text}</div>`:''}</div>`;
+  if (A && G.phase!=='over'){
+    // Ready options
+    if (A.ready.length){
+      h += `<div class="sec"><h3>${A.has14?'Discards that make you ready':'You are waiting on'}</h3>`;
+      A.ready.slice(0,4).forEach(r=>{
+        h += `<div class="ready">${r.d!=null?`Discard ${mini(r.d)} → wait on:`:'Winning tiles:'}<div class="wl">${r.waits.map(w=>{
+          const cls = w.fanD>=3?'ok':(w.fanS>=3?'so':'no');
+          const lbl = w.fanD>=3?`${w.fanD} fan`:(w.fanS>=3?`${w.fanS} fan self-drawn only`:`only ${w.fanD} fan ✗`);
+          return `<span class="wt ${cls}">${mini(w.t)} ${lbl} · ${w.left} left</span>`; }).join('')}</div></div>`;
+      });
+      h += `<div class="muted" style="font-size:14px">Green = wins on anyone's discard · Yellow = only if you draw it yourself (+1 自摸) · Red = not enough fan.</div></div>`;
+    }
+    // Targets
+    const shown = [];
+    const bestOf = pred => A.all.filter(pred).sort((a,b)=>targetScore(b)-targetScore(a) || a.s-b.s)[0];
+    const ff = bestOf(x=>x.tg.kind==='flush'&&x.tg.full), hf = bestOf(x=>x.tg.kind==='flush'&&!x.tg.full);
+    [hf, ff].forEach(x=>x&&shown.push(x));
+    A.all.forEach(x=>{ if (x.tg.kind!=='flush' && !(x.tg.kind==='orphans' && x.s>4)) shown.push(x); });
+    shown.sort((a,b)=> (b.w*b.prob - a.w*a.prob) || (a.s-b.s));
+    h += `<div class="sec"><h3>Hands you could make</h3>`;
+    shown.forEach(x=>{
+      const ok = x.fan>=3 && !x.risky, so = !ok && x.fan+1>=3;
+      const fanCls = ok?'ok':(so||x.risky?'':'no');
+      const fanTxt = x.tg.kind==='orphans' ? 'Limit 13'
+        : x.risky ? `≈${x.fan} fan only if you draw no flowers`
+        : `≈${x.fan} fan${ok?' ✓':(so?' (3 if self-drawn)':' ✗')}`;
+      const dist = x.s<0?'complete!':(x.s===0?'ready!':`${x.s} away`);
+      const disc = A.has14 && x.discards.length && x.s>=0 ? ` · discard ${x.discards.slice(0,3).map(mini).join('')}` : '';
+      h += `<div class="trow ${G.focus===x.tg.key?'focus':''} ${x.w?'':'nq'}" data-focus="${x.tg.key}">
+        <div class="tname"><span class="cn">${x.tg.cn}</span>${x.tg.en}</div><div class="tfan ${fanCls}">${fanTxt}</div>
+        <div class="tmeta">${dist} · ${x.u} useful tiles${disc}${x.tg.open?'':' · concealed only'}</div><div class="pct">${pctTxt(x.w?x.prob*x.w:x.prob)}</div>
+        <div class="bar"><i style="width:${Math.round((x.w?x.prob*x.w:x.prob)*100)}%"></i></div>
+        ${G.focus===x.tg.key?`<div class="tkeep">${x.tg.keep}</div>`:''}</div>`;
+    });
+    h += `<div class="muted" style="font-size:14px;line-height:1.45">Click a hand to dim tiles that don't fit it. Chance is a rough estimate of completing that hand from your remaining draws${''} (and claims, for open hands), using the tiles you haven't seen.</div></div>`;
+    // Fan sources
+    h += `<div class="sec"><h3>Fan you already have</h3><div class="fanlist">`;
+    if (!A.ex.items.length && !A.ex.concealed) h += `<span class="muted">None yet.</span>`;
+    A.ex.items.forEach(i=> h += `<div><span class="cn">${i.cn}</span> ${i.en} · <b>+${i.fan}</b></div>`);
+    if (A.ex.concealed) h += `<div><span class="cn">門前清</span> Concealed hand (as long as you don't claim) · <b>+1</b></div>`;
+    h += `<div class="muted">+1 more if you win by drawing the tile yourself (自摸).</div>`;
+    A.ex.pairs.forEach(t=> h += `<div>💡 Pair of ${mini(t)} — make it a pung for <b>+1 fan</b>.</div>`);
+    h += `</div></div>`;
+    h += tableReadHTML(p);
+  }
+  // Numbers reference
+  h += `<div class="sec"><details><summary>Chinese numbers 1–9 &nbsp;(一 … 九)</summary>
+    <label class="chk"><input type="checkbox" id="numQuiz" ${G.numQuiz?'checked':''}> Quiz me (hover to reveal)</label>
+    <div class="numgrid ${G.numQuiz?'quiz':''}">${CN_NUM.map((c,i)=>`<div class="numcard"><div class="c">${c}</div><div class="a">${i+1}</div><div class="p">${PY_NUM[i]}</div></div>`).join('')}
+    <div class="numcard"><div class="c">萬</div><div class="a">10,000</div><div class="p">wàn</div></div></div></details></div>`;
+  // Log
+  h += `<div class="sec"><h3>Game log</h3><div class="log">${G.log.map(l=>`<div>${l}</div>`).join('')}</div></div>`;
+  const scroll = $('#coach').scrollTop;
+  el.innerHTML = h;
+  $('#coach').scrollTop = scroll;
+  const nd = el.querySelector('details'); if (nd && G.numOpen) nd.open = true;
+}
+
+function rulesHTML(){
+  const rows = [
+    ['自摸','Self-drawn win',1],['門前清','Concealed hand (no claimed sets)',1],['平糊','All chows (runs)',1],['無花','No flowers',1],
+    ['正花','Own flower / own season (each)',1],['一台花','All four flowers or all four seasons',2],
+    ['番子','Pung of a dragon 中 發 白 (each)',1],['門風','Pung of your seat wind',1],['圈風','Pung of the round wind',1],
+    ['海底撈月','Win on the very last tile',1],['槓上開花','Win on a kong replacement tile',1],['搶槓','Robbing a kong: win on the tile someone adds to a pung',1],['混么九','Only terminals & honours (all pungs)',1],
+    ['對對糊','All pungs',3],['混一色','Half flush: one suit + honours',3],['七對子','Seven pairs',4],['小三元','Small three dragons',5],
+    ['小四喜','Small four winds',6],['清一色','Full flush: one suit only',7],['大三元','Great three dragons',8],['槓上槓','Win after two kongs in a row',8],
+    ['字一色','All honours',10],['清么九','All terminals (1s and 9s)',10],
+    ['十三么','Thirteen orphans','Limit'],['坎坎糊','Four concealed pungs','Limit'],['大四喜','Great four winds','Limit'],['九子連環','Nine gates','Limit'],['天糊','Heavenly hand (dealer wins on deal)','Limit'],['地糊','Earthly hand (win on the dealer’s first discard)','Limit'],
+    ['十八羅漢','Four kongs','Limit'],['八仙過海','All eight flowers & seasons (instant win)','Limit']];
+  return `<h2>Hong Kong Mahjong — quick rules</h2>
+  <p class="lead">Goal: 4 sets + 1 pair (14 tiles). A set is a <b>chow</b> 上 (run like 3-4-5 of one suit), a <b>pung</b> 碰 (three of a kind) or a <b>kong</b> 槓 (four of a kind). You need at least <b>3 fan</b> to declare a win.</p>
+  <ul style="font-size:16px;line-height:1.6;padding-left:18px">
+    <li>On your turn you draw, then discard one tile (click it).</li>
+    <li>You can <b>pung</b> or <b>kong</b> anyone's discard, but <b>chow</b> only from the player just before you.</li>
+    <li>Winning beats pung/kong, which beat chow.</li>
+    <li>Claiming a tile exposes the set and loses the 門前清 concealed bonus.</li>
+    <li>Flowers/seasons are set aside automatically and give bonus fan; your own flower is number ${'1=East, 2=South, 3=West, 4=North'}.</li>
+    <li>Scoring: points = 2^fan-ish table (3 fan = 8 … limit = 256). Discarder pays double; on a self-draw everyone pays.</li>
+  </ul>
+  <table class="rules">${rows.map(r=>`<tr><td class="cn">${r[0]}</td><td>${r[1]}</td><td class="f">${r[2]}</td></tr>`).join('')}</table>
+  <div class="mbtns"><button class="mbtn" onclick="$('#rulesModal').classList.remove('show')">Got it</button></div>`;
+}
+
+/* ================= Events ================= */
+document.addEventListener('click', e=>{
+  const b = e.target.closest('[data-act]');
+  if (b && !b.disabled){
+    const a = b.dataset.act, ctx = G.turnCtx;
+    if (a==='win' && G.phase==='turn') act({type:'win'});
+    else if (a==='kong' && G.phase==='turn') act({type:'kong', k:ctx.kongs[+b.dataset.k]});
+    else if (G.phase==='claim'){
+      if (a==='cwin') act({type:'win'});
+      else if (a==='ckong') act({type:'kong'});
+      else if (a==='cpung') act({type:'pung'});
+      else if (a==='cchow') act({type:'chow', start:+b.dataset.st});
+      else if (a==='pass') act({type:'pass'});
+    }
+    return;
+  }
+  if (e.target.closest('[data-sort]')){ if (G.tray) sortTray(); return; }
+  const d = e.target.closest('[data-discard]');
+  if (d && G.phase==='turn'){ act({type:'discard', t:+d.dataset.discard}); return; }
+  const f = e.target.closest('[data-focus]');
+  if (f){ G.focus = G.focus===f.dataset.focus ? null : f.dataset.focus; render(); return; }
+  if (e.target.id==='hintBtn') showHint();
+});
+// Pointer dragging inside the tray (click without moving = discard)
+let drag = null;
+document.addEventListener('pointerdown', e=>{
+  const el = e.target.closest && e.target.closest('.tray .tile[data-item]');
+  if (!el || e.button!==0) return;
+  const tray = el.parentElement, r = tray.getBoundingClientRect();
+  const it = G.tray.items.find(i=>i.id===+el.dataset.item); if (!it) return;
+  drag = {el, it, sx:e.clientX, sy:e.clientY, z: r.width / tray.offsetWidth || 1, moved:false, touch: e.pointerType!=='mouse',
+          ox: parseFloat(el.style.left), oy: parseFloat(el.style.top)};
+  try { el.setPointerCapture(e.pointerId); } catch(_){} e.preventDefault();
+});
+document.addEventListener('pointermove', e=>{
+  if (!drag) return;
+  const dx = (e.clientX-drag.sx)/drag.z, dy = (e.clientY-drag.sy)/drag.z;
+  if (!drag.moved && Math.hypot(dx,dy) < 6) return;
+  if (!drag.moved){ drag.moved = true; drag.el.classList.add('dragging'); tip.style.display='none'; }
+  drag.el.style.left = (drag.ox+dx)+'px'; drag.el.style.top = (drag.oy+dy)+'px';
+});
+document.addEventListener('pointerup', e=>{
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (!d.moved){
+    if (d.touch && G.selItem!==d.it.id){
+      // touch: first tap lifts the tile and reveals its Chinese / pinyin
+      G.selItem = d.it.id; render();
+      const nel = document.querySelector(`.tray .tile[data-item="${d.it.id}"]`);
+      if (nel) showTipAt(nel, tileTip(d.it.t) + (G.phase==='turn' ? '<br><span style="opacity:.75">Tap again to discard</span>' : ''));
+      return;
+    }
+    G.selItem = null;
+    if (G.phase==='turn'){ G.trayRemoveId = d.it.id; tip.style.display='none'; act({type:'discard', t:d.it.t}); }
+    else render();
+    return;
+  }
+  const dx = (e.clientX-d.sx)/d.z, dy = (e.clientY-d.sy)/d.z;
+  const x = Math.round(((d.ox+dx)/G.trayTW)*20)/20, y = Math.round(((d.oy+dy)/G.trayTH)*20)/20;
+  const s = freeSpot(x, y, d.it); d.it.x = s.x; d.it.y = s.y;
+  render();
+});
+document.addEventListener('pointercancel', ()=>{ if (drag){ drag=null; render(); } });
+document.addEventListener('change', e=>{
+  if (e.target.id==='optDangerDots'){ S.dangerDots = e.target.checked; saveS(); render(); return; }
+  if (e.target.id==='rvOnlyBad'){ G.reviewOnlyBad = e.target.checked; openReview($('#reviewModal').dataset.fromEnd==='1'); return; }
+  if (e.target.id==='numQuiz'){ G.numQuiz = e.target.checked; G.numOpen = true; renderCoach(); }
+});
+document.addEventListener('toggle', e=>{ if (e.target.tagName==='DETAILS' && e.target.closest('#coachBody')) G.numOpen = e.target.open; }, true);
+$('#hintTop').onclick = showHint;
+$('#coachToggle').onclick = ()=>{ document.body.classList.toggle('coach-open'); setTimeout(render, 320); };
+$('#coachClose').onclick = ()=>{ document.body.classList.remove('coach-open'); setTimeout(render, 320); };
+$('#handsBtn').onclick = openHands;
+document.addEventListener('input', e=>{ if (e.target.id==='handsLimit'){ G.handsLimit = +e.target.value; applyHandsFilter(); } });
+$('#reviewBtn').onclick = ()=>openReview(G.phase==='over');
+$('#rulesBtn').onclick =()=>{ $('#rulesBody').innerHTML = rulesHTML(); $('#rulesModal').classList.add('show'); };
+$('#settingsBtn').onclick = openSettings;
+$('#settingsCancel').onclick = ()=>{ if (G.players.length) $('#settingsModal').classList.remove('show'); };
+$('#startBtn').onclick = ()=>{
+  S.ai = +document.querySelector('input[name=ai]:checked').value;
+  S.aiStyle = document.querySelector('input[name=aistyle]:checked').value;
+  S.mode = document.querySelector('input[name=mode]:checked').value;
+  S.speed = document.querySelector('input[name=speed]:checked').value;
+  S.flowers = $('#optFlowers').checked; S.tips = $('#optTips').checked;
+  saveS(); applyMode();
+  $('#settingsModal').classList.remove('show');
+  newGame();
+};
+function openSettings(){
+  document.querySelector(`input[name=ai][value="${S.ai}"]`).checked = true;
+  document.querySelector(`input[name=aistyle][value="${S.aiStyle||'mixed'}"]`).checked = true;
+  document.querySelector(`input[name=mode][value="${S.mode}"]`).checked = true;
+  document.querySelector(`input[name=speed][value="${S.speed}"]`).checked = true;
+  $('#optFlowers').checked = S.flowers; $('#optTips').checked = S.tips;
+  $('#settingsCancel').style.display = G.players.length ? '' : 'none';
+  $('#settingsModal').classList.add('show');
+}
+function applyMode(){
+  document.body.classList.remove('mode-hover','mode-quiz','mode-chinese','mode-arabic');
+  document.body.classList.add('mode-'+S.mode);
+}
+document.addEventListener('keydown', e=>{
+  if (e.target.tagName==='INPUT') return;
+  if (e.key==='h'||e.key==='H') showHint();
+  else if (e.key==='c'||e.key==='C') $('#coachToggle').click();
+  else if ((e.key==='p'||e.key==='P'||e.key===' ') && G.phase==='claim'){ e.preventDefault(); act({type:'pass'}); }
+});
+// Tooltip
+const tip = $('#tip');
+document.addEventListener('mousemove', e=>{
+  const el = e.target.closest('[data-t],[data-tipx]');
+  if (!el || !S.tips || el.classList.contains('back')){ tip.style.display='none'; return; }
+  let html = el.dataset.tipx || tileTip(+el.dataset.t);
+  if (el.dataset.from!=null && G.players[+el.dataset.from]) html += `<br><span style="opacity:.7">Discarded by ${G.players[+el.dataset.from].name}</span>`;
+  tip.innerHTML = html; tip.style.display='block';
+  const z = S.scale || 1;
+  const x = Math.min(e.clientX+14, innerWidth - tip.offsetWidth*z - 8), y = Math.max(8, e.clientY - tip.offsetHeight*z - 12);
+  tip.style.left = (x/z)+'px'; tip.style.top = (y/z)+'px';
+});
+function showTipAt(el, html){
+  if (!S.tips) return;
+  tip.innerHTML = html; tip.style.display='block';
+  const z = S.scale || 1, r = el.getBoundingClientRect();
+  const x = Math.max(8, Math.min(r.left + r.width/2 - tip.offsetWidth*z/2, innerWidth - tip.offsetWidth*z - 8));
+  const y = Math.max(8, r.top - tip.offsetHeight*z - 10);
+  tip.style.left = (x/z)+'px'; tip.style.top = (y/z)+'px';
+}
+// Touch: tapping a tile anywhere outside your hand (discards, melds, coach) reveals it briefly
+document.addEventListener('pointerdown', e=>{
+  if (e.pointerType==='mouse') return;
+  const el = e.target.closest && e.target.closest('[data-t]');
+  if (!el){ if (!e.target.closest('.tray')){ tip.style.display='none'; if (G.selItem){ G.selItem=null; render(); } } return; }
+  if (el.closest('.tray') || el.classList.contains('back')) return;
+  document.querySelectorAll('.tile.reveal').forEach(x=>{ if (!x.closest('.tray')) x.classList.remove('reveal'); });
+  el.classList.add('reveal');
+  let html = tileTip(+el.dataset.t);
+  if (el.dataset.from!=null && G.players[+el.dataset.from]) html += `<br><span style="opacity:.7">Discarded by ${G.players[+el.dataset.from].name}</span>`;
+  showTipAt(el, html);
+  clearTimeout(showTipAt.t); showTipAt.t = setTimeout(()=>{ tip.style.display='none'; el.classList.remove('reveal'); }, 2500);
+});
+// Interface size
+const SCALE_MIN = .8, SCALE_MAX = 1.8;
+function applyScale(){
+  S.scale = Math.round(Math.max(SCALE_MIN, Math.min(SCALE_MAX, S.scale||1))*20)/20;
+  document.body.style.zoom = S.scale;
+  document.body.style.setProperty('--z', S.scale);
+  updateLayoutClass();
+  $('#scalePct').textContent = Math.round(S.scale*100)+'%';
+  const sl = $('#optScale'); if (sl){ sl.value = S.scale; $('#optScaleVal').textContent = Math.round(S.scale*100)+'%'; }
+  render();
+}
+function bumpScale(d){ S.scale = (S.scale||1) + d; saveS(); applyScale(); }
+$('#scaleDown').onclick = ()=>bumpScale(-.1);
+$('#scaleUp').onclick = ()=>bumpScale(.1);
+$('#optScale').oninput = e=>{ S.scale = +e.target.value; saveS(); applyScale(); };
+document.addEventListener('keydown', e=>{
+  if (e.target.tagName==='INPUT') return;
+  if (e.key==='+'||e.key==='=') bumpScale(.1);
+  else if (e.key==='-'||e.key==='_') bumpScale(-.1);
+});
+applyScale();
+function updateLayoutClass(){
+  const w = innerWidth / (S.scale||1);
+  const wasMobile = document.body.classList.contains('mobile');
+  document.body.classList.toggle('mobile', w < 700);
+  if (w < 700 && !wasMobile) document.body.classList.remove('coach-open');
+  document.body.classList.toggle('narrow', w < 1000);
+  document.body.classList.toggle('tiny', w < 640);
+}
+window.addEventListener('resize', ()=>{ updateLayoutClass(); render(); });
+
+applyMode();
+openSettings();
+</script>
+</body>
+</html>
